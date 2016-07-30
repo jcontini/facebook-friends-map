@@ -4,6 +4,8 @@ from datetime import datetime
 from sys import argv
 os.system('clear')
 
+browser = webdriver.Firefox()
+
 # --------------- Ask user to log in -----------------
 def fb_login():
 	print "Opening browser..."
@@ -121,7 +123,6 @@ def scrape_2nd_degrees():
 
 # --------------- Start Scraping ---------------
 now = datetime.now()
-browser = webdriver.Firefox()
 
 fb_login()
 
@@ -133,4 +134,4 @@ elif len(argv) is 2:
 	
 else:
 	print "Invalid # of arguments specified. Use none to scrape your 1st degree connections, or specify the name of the CSV file as the first argument."
-	
+
