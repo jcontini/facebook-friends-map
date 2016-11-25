@@ -1,0 +1,5 @@
+# Downloaded data
+takeout-*.zip
+
+# Generated files
+notes_*.csv
