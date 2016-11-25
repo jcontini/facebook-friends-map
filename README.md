@@ -7,8 +7,7 @@ Apparently there's no simple way to export your notes from Google Keep to a CSV 
 1. Go to [Google Takeout](https://takeout.google.com/settings/takeout)
 2. Make sure the 'Keep' checkbox is selected (you can deselect all others)
 3. Download and export the archive to a folder that has the 'Keep' folder
-4. Place **keep-scrape.py** in the same folder that has the 'Keep' folder
-5. Run ``python keep-scrape.py``. That should export your notes to a CSV.
+4. Run ``python keep-scrape.py``. That should export your notes to a CSV.
 
 **Requires**:
 - [Beautiful Soup 4](https://pypi.python.org/pypi/beautifulsoup4)
