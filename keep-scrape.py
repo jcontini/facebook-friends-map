@@ -39,7 +39,8 @@ for file in files:
 		writer.writerow([note['date'],note['title'],note['content'], file])
 
 	#In case a note has a blank title or content, continue anyway
-	except:
+	except Exception as e:
+	        print "Note %s has blank title or content: %s." % (file, e)
 		pass
 
 print ('\n'+('-'*20)+'\nDone! %s notes saved to CSV.\n'+('-'*20)) % len(files)
