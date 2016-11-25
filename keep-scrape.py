@@ -1,8 +1,14 @@
 #!/usr/bin/env python
-import os, bs4, glob, csv
+# -*- coding: utf-8 -*-
+
+import os, bs4, glob, unicodecsv as csv
 from dateutil.parser import parse
 from datetime import datetime
 
+french2english = { u'à': 'at',
+        'janv.': 'january', u'févr.': 'february', 'mars': 'march', 'avr.': 'april',
+        'mai': 'may', 'juin':'june', 'juil.': 'july', u'août': 'august',
+        u'déc': 'dec'} # Mapping to handle french dates in Google Takeout's output
 files = glob.glob("Keep/*.html")
 notes = []
 
@@ -18,6 +24,10 @@ for file in files:
 
 	#Make Excel-Friendly date
 	googDate = soup.select('.heading')[0].getText().strip()
+	to_replace = [k for k in french2english.keys() if k in googDate]
+	if len(to_replace):
+		for k in to_replace:
+			googDate = googDate.replace(k, french2english[k])
 	xlDate = datetime.strftime(parse(googDate), '%m/%d/%Y %H:%M')
 
 	#Convert <br>'s to line breaks.
