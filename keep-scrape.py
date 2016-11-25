@@ -14,7 +14,7 @@ writer.writerow(['date', 'title', 'content', 'file'])
 
 for file in files:
 	page = open(file)
-	soup = bs4.BeautifulSoup(page.read())
+	soup = bs4.BeautifulSoup(page.read(), "html.parser")
 
 	#Make Excel-Friendly date
 	googDate = soup.select('.heading')[0].getText().strip()
