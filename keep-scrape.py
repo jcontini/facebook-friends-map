@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import os, bs4, glob, csv
 from dateutil.parser import parse
 from datetime import datetime
