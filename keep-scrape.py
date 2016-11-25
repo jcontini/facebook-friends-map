@@ -30,15 +30,23 @@ for file in files:
 			googDate = googDate.replace(k, french2english[k])
 	xlDate = datetime.strftime(parse(googDate), '%m/%d/%Y %H:%M')
 
-	#Convert <br>'s to line breaks.
-	for br in soup.select('.content')[0].find_all("br"):
-		br.replace_with("\n")
-
+	content = soup.select(".content")[0].getText()
+	content_has_checkboxes = content.find(u"☐") is not -1 or content.find(u"☑") is not -1
+	# If the note has checkboxes, simply remove <br>
+	if content.find(u"☐") is not -1 or content.find(u"☑") is not -1:
+		# Convert <br>'s to line breaks.
+		for br in soup.select('.content')[0].find_all("br"):
+			br.replace_with("\n")
+		content = soup.select(".content")[0].getText()
+	else:
+		# The previous method truncates other notes after the first \n. To avoid this issue, use Tag.strings
+		content = "\n".join([s for s in soup.select(".content")[0].strings])
 	try:
 		note = {
 			"date": xlDate,
 			"title": soup.select('.title')[0].getText(),
-			"content": soup.select('.content')[0].getText()
+			"content": content
+
 		}
 
 		print "\n" + ('-'*15) + file + ('-'*15)
