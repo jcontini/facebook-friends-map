@@ -1,18 +1,3 @@
-# Scrapers
-Scrapers to free our data from web services. All currently require Python 2.7.
-
-## Google Keep
-Apparently there's no simple way to export your notes from Google Keep to a CSV or spreadsheet. This does that from a Google Takeout archive. Instructions:
-
-1. Go to [Google Takeout](https://takeout.google.com/settings/takeout)
-2. Make sure the 'Keep' checkbox is selected (you can deselect all others)
-3. Download and export the archive to a folder that has the 'Keep' folder
-4. Place **keep-scrape.py** in the same folder that has the 'Keep' folder
-5. Run ``python keep-scrape.py``. That should export your notes to a CSV.
-
-**Requires**:
-- [Beautiful Soup 4](https://pypi.python.org/pypi/beautifulsoup4)
-
 ## Facebook
 Getting your list of friends is no longer possible via the Facebook Graph API, so you can use this. It has 2 modes: 1) Download a list of your connections, and 2) Download a list of your 2nd-degree connections for social network analysis. Both modes save data to a CSV in a format friendly for importing into graph databases.
 
