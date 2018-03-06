@@ -18,15 +18,18 @@ def download_photos():
         data = json.load(json_file)
         for i,d in enumerate(data['tagged']):
             if d['type'] == 'image':
-                new_filename = folder + d['fb_url'].split('fbid=')[1].split('&')[0] + '.jpg'
+                #Save new file
+                filename_date = parse(d['fb_date']).strftime("%Y-%m-%d")
+                img_id = d['fb_url'].split('fbid=')[1].split('&')[0]
+                new_filename = folder + filename_date + '_' + img_id + '.jpg'
                 img_file = wget.download(d['img_url'], new_filename)
 
                 #Update EXIF Date Created
                 exif_dict = piexif.load(img_file)
-                new_date = parse(d['fb_date']).strftime("%Y:%m:%d %H:%M:%S")
-                exif_dict['Exif'][piexif.ExifIFD.DateTimeOriginal] = new_date
+                exif_date = parse(d['fb_date']).strftime("%Y:%m:%d %H:%M:%S")
+                exif_dict['Exif'][piexif.ExifIFD.DateTimeOriginal] = exif_date
                 piexif.insert(piexif.dump(exif_dict), img_file)
-                print('\n' + str(i) + ') '+ new_filename +' date updated to: ' + new_date) 
+                print('\n' + str(i+1) + ') '+ new_filename +' new date: ' + exif_date)
 
 def main(username, password):
     #Start Browser
@@ -64,7 +67,7 @@ def main(username, password):
             'fb_url': driver.current_url,
             'fb_date': wait.until(EC.presence_of_element_located((By.CLASS_NAME, "timestampContent"))).text,
             'fb_caption': wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="fbPhotoSnowliftCaption"]'))).text,
-            'fb_tags': wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="fbPhotoSnowliftTagList"]'))).text,
+            'fb_tags': wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="fbPhotoSnowliftTagList"]'))).text.replace('\u2014 ',''),
             'user_name': user.text,
             'user_url': user.get_attribute('href'),
             'user_id': user.get_attribute('data-hovercard').split('id=')[1].split('&')[0]
@@ -100,7 +103,6 @@ if __name__ == '__main__':
     parser.add_argument('-p', type = str,help='FB Password')
     parser.add_argument('--download', action='store_true', help='Download photos')
     args = parser.parse_args()
-    print(args.download)
     if args.download:
         download_photos()
     else:
