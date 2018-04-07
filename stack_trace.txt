@@ -1,0 +1,17 @@
+{'fb_url': 'https://www.facebook.com/photo.php?fbid=489383410882&set=t.21600187&type=3&theater', 'fb_date': 'October 22, 2010', 'fb_caption': '', 'fb_tags': 'With Stephen Shin and Joe Contini.', 'user_name': 'Osman Gokhan Bas', 'user_url': 'https://www.facebook.com/osmangokhanbas', 'user_id': '678500882', 'type': 'image', 'img_url': 'https://scontent-sin6-2.xx.fbcdn.net/v/t31.0-8/52492_489649430882_2951626_o.jpg?oh=965dbd1db668fd5b5e90db63c104a701&oe=5B3F6EB3', 'album': 'https://www.facebook.com/media/set/?set=a.452560580882.253174.678500882&type=3'}
+Traceback (most recent call last):
+  File "get-tagged-photos.py", line 109, in <module>
+    main(args.u,args.p)
+  File "get-tagged-photos.py", line 81, in main
+    doc['img_url'] = wait.until(EC.presence_of_element_located((By.XPATH, "//img[@class = 'spotlight']"))).get_attribute('src')
+  File "/Users/jcontini/anaconda3/lib/python3.6/site-packages/selenium/webdriver/remote/webelement.py", line 143, in get_attribute
+    resp = self._execute(Command.GET_ELEMENT_ATTRIBUTE, {'name': name})
+  File "/Users/jcontini/anaconda3/lib/python3.6/site-packages/selenium/webdriver/remote/webelement.py", line 628, in _execute
+    return self._parent.execute(command, params)
+  File "/Users/jcontini/anaconda3/lib/python3.6/site-packages/selenium/webdriver/remote/webdriver.py", line 312, in execute
+    self.error_handler.check_response(response)
+  File "/Users/jcontini/anaconda3/lib/python3.6/site-packages/selenium/webdriver/remote/errorhandler.py", line 242, in check_response
+    raise exception_class(message, screen, stacktrace)
+selenium.common.exceptions.StaleElementReferenceException: Message: stale element reference: element is not attached to the page document
+  (Session info: chrome=65.0.3325.146)
+  (Driver info: chromedriver=2.35.528157 (4429ca2590d6988c0745c24c8858745aaaec01ef),platform=Mac OS X 10.13.2 x86_64)

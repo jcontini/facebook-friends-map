@@ -20,7 +20,7 @@ def download_photos():
             if d['type'] == 'image':
                 #Save new file
                 filename_date = parse(d['fb_date']).strftime("%Y-%m-%d")
-                img_id = d['fb_url'].split('fbid=')[1].split('&')[0]
+                img_id = d['img_url'].split('_')[1]
                 new_filename = folder + filename_date + '_' + img_id + '.jpg'
                 img_file = wget.download(d['img_url'], new_filename)
 
