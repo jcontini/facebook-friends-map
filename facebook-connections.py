@@ -4,6 +4,8 @@ from datetime import datetime
 from sys import argv
 os.system('clear')
 
+os.environ["DEBUSSY"] = "1"
+
 browser = webdriver.Firefox()
 
 # --------------- Ask user to log in -----------------
@@ -78,7 +80,7 @@ def scrape_1st_degrees():
 	writer.writerow(['A_id','A_name','B_id','B_name','active'])
 
 	#Get your unique Facebook ID
-	profile_icon = browser.find_element_by_css_selector("[data-click='profile_icon'] > a > img")
+	profile_icon = browser.find_element_by_css_selector("[data-click='profile_icon'] > a > span > img")
 	myid = profile_icon.get_attribute("id")[19:]
 
 	#Scan your Friends page (1st-degree connections)
