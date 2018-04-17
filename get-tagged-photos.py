@@ -63,7 +63,7 @@ def main(username, password):
             print('Done!')
             break
 
-        user = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="fbPhotoSnowliftAuthorName"]/a')))
+        user = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="fbPhotoSnowliftAuthorName"]//a')))
         doc = {
             'fb_url': driver.current_url,
             'fb_date': wait.until(EC.presence_of_element_located((By.CLASS_NAME, "timestampContent"))).text,
