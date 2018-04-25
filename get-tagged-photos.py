@@ -22,23 +22,29 @@ def download_photos():
                 filename_date = parse(d['fb_date']).strftime("%Y-%m-%d")
                 img_id = d['img_url'].split('_')[1]
                 new_filename = folder + filename_date + '_' + img_id + '.jpg'
-                img_file = wget.download(d['img_url'], new_filename)
+                if os.path.exists(new_filename):
+                    print("File Exists, Skipping: %s" % (new_filename))
+                else:
+                    img_file = wget.download(d['img_url'], new_filename)
 
-                #Update EXIF Date Created
-                exif_dict = piexif.load(img_file)
-                exif_date = parse(d['fb_date']).strftime("%Y:%m:%d %H:%M:%S")
-                exif_dict['Exif'][piexif.ExifIFD.DateTimeOriginal] = exif_date
-                piexif.insert(piexif.dump(exif_dict), img_file)
-                print('\n' + str(i+1) + ') '+ new_filename +' new date: ' + exif_date)
+                    #Update EXIF Date Created
+                    exif_dict = piexif.load(img_file)
+                    exif_date = parse(d['fb_date']).strftime("%Y:%m:%d %H:%M:%S")
+                    exif_dict['Exif'][piexif.ExifIFD.DateTimeOriginal] = exif_date
+                    piexif.insert(piexif.dump(exif_dict), img_file)
+                    print('\n' + str(i+1) + ') '+ new_filename +' new date: ' + exif_date)
 
-def main(username, password):
+def index_photos(username, password):
     #Start Browser
+    print("Opening Browser...")
     chrome_options = Options()
     chrome_options.add_argument("--disable-notifications")
     driver = webdriver.Chrome(chrome_options=chrome_options)
+    wait = WebDriverWait(driver, 10)
     driver.get("https://www.facebook.com")
 
     #Log In
+    print("Logging In...")
     email_id = driver.find_element_by_id("email")
     pass_id = driver.find_element_by_id("pass")
     email_id.send_keys(username)
@@ -46,15 +52,16 @@ def main(username, password):
     driver.find_element_by_id("loginbutton").click()
 
     #Nav to photos I'm tagged in page
+    print("Scanning Photos...")
     driver.find_element_by_id("navItem_2305272732").click()
-    time.sleep(4)
+    wait.until(EC.presence_of_element_located((By.CLASS_NAME, "uiMediaThumbImg")))
     driver.find_elements_by_css_selector(".uiMediaThumbImg")[0].click()
 
     #Prep structure
     data = {}
     data['tagged'] = []
     fb_urls = []
-    wait = WebDriverWait(driver, 10)
+    last_media = ''
 
     while True:
         #Finish up if reached end
@@ -62,7 +69,17 @@ def main(username, password):
             print('Done!')
             break
 
+        #Make sure page data has fully refreshed, then grab new data
         user = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="fbPhotoSnowliftAuthorName"]/a')))
+        media_url = wait.until(EC.presence_of_element_located((By.XPATH, "//img[@class='spotlight']"))).get_attribute('src')
+        is_video = "showVideo" in driver.find_element_by_css_selector(".stageWrapper").get_attribute("class")
+
+        if len(data['tagged']) != 0:
+            while (data['tagged'][-1]['media_url'] == media_url) and not is_video:
+                media_url = wait.until(EC.presence_of_element_located((By.XPATH, "//img[@class='spotlight']"))).get_attribute('src')
+                print("Waiting for media to refresh...\nOld: %s\nNew: %s" % (data['tagged'][-1]['media_url'],media_url))
+                time.sleep(1)
+
         doc = {
             'fb_url': driver.current_url,
             'fb_date': wait.until(EC.presence_of_element_located((By.CLASS_NAME, "timestampContent"))).text,
@@ -73,37 +90,38 @@ def main(username, password):
             'user_id': user.get_attribute('data-hovercard').split('id=')[1].split('&')[0]
         }
 
-        is_video = "showVideo" in driver.find_element_by_css_selector(".stageWrapper").get_attribute("class")
+        doc['media_url'] = media_url
         if is_video:
             doc['type'] = 'video'
         else:
             doc['type'] = 'image'
-            doc['img_url'] = wait.until(EC.presence_of_element_located((By.XPATH, "//img[@class = 'spotlight']"))).get_attribute('src')
 
         #Get album if present
         if len(driver.find_elements_by_xpath('//*[@class="fbPhotoMediaTitleNoFullScreen"]/div/a')) > 0:
             doc['album'] = driver.find_element_by_xpath('//*[@class="fbPhotoMediaTitleNoFullScreen"]/div/a').get_attribute('href')
 
         #Get Deets & move on
-        print(doc)
         fb_urls.append(doc['fb_url'])
+        print("%s) %s // %s" % (len(fb_urls), doc['fb_date'],doc['fb_tags']))
         data['tagged'].append(doc)
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".snowliftPager.next"))).click()
 
     #Save JSON of deets
+    print("Saving Index...")
     with open('tagged.json', 'w') as json_file:
         json.dump(data, json_file, indent=4)
-
-    #Now download the photos!
-    download_photos()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Facebook Scraper')
     parser.add_argument('-u', type = str,help='FB Username')
     parser.add_argument('-p', type = str,help='FB Password')
     parser.add_argument('--download', action='store_true', help='Download photos')
+    parser.add_argument('--index', action='store_true', help='Index photos')
     args = parser.parse_args()
+    if args.index:
+        index_photos(args.u,args.p)
     if args.download:
         download_photos()
-    else:
-        main(args.u,args.p)
+    if not args.index and not args.download:
+        index_photos(args.u,args.p)
+        download_photos()
