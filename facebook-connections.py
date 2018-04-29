@@ -1,26 +1,32 @@
 import os, datetime, time, csv
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from datetime import datetime
 from sys import argv
-os.system('clear')
+print("\n" * 100)
 
 os.environ["DEBUSSY"] = "1"
 
-browser = webdriver.Firefox()
+# Configure browser session
+wd_options = Options()
+wd_options.add_argument("--disable-notifications")
+wd_options.add_argument("--disable-infobars")
+wd_options.add_argument("--mute-audio")
+browser = webdriver.Chrome(chrome_options=wd_options)
 
 # --------------- Ask user to log in -----------------
 def fb_login():
-	print "Opening browser..."
+	print("Opening browser...")
 	browser.get("https://www.facebook.com/")
-	a = raw_input("Please log into facebook and press enter after the page loads...")
+	a = input("Please log into facebook and press enter after the page loads...")
 
 # --------------- Scroll to bottom of page -----------------
 def scroll_to_bottom():
-	print "Scrolling to bottom..."
+	print("Scrolling to bottom...")
 	while True:
 			try:
 				browser.find_element_by_class_name('_4khu') # class after friend's list
-				print "Reached end!"
+				print("Reached end!")
 				break
 			except:
 				browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
@@ -29,17 +35,17 @@ def scroll_to_bottom():
 
 # --------------- Get list of all friends on page ---------------
 def scan_friends():
-	print 'Scanning page for friends...'
+	print('Scanning page for friends...')
 	friends = []
 	friend_cards = browser.find_elements_by_xpath('//div[@id="pagelet_timeline_medley_friends"]//div[@class="fsl fwb fcb"]/a')
 
 	for friend in friend_cards:
 		if friend.get_attribute('data-hovercard') is None:
-			print " %s (INACTIVE)" % friend.text
+			print(" %s (INACTIVE)" % friend.text)
 			friend_id = friend.get_attribute('ajaxify').split('id=')[1]
 			friend_active = 0
 		else:
-			print " %s" % friend.text
+			print(" %s" % friend.text)
 			friend_id = friend.get_attribute('data-hovercard').split('id=')[1].split('&')[0]
 			friend_active = 1
 
@@ -49,7 +55,7 @@ def scan_friends():
 			'active': friend_active
 			})
 
-	print 'Found %r friends on page!' % len(friends)
+	print('Found %r friends on page!' % len(friends))
 	return friends
 
 # ----------------- Load list from CSV -----------------
@@ -65,10 +71,10 @@ def load_csv(filename):
 					"uid":row['B_id']
 					})
 			else:
-				print "Skipping %s (inactive)" % row['B_name']
+				print("Skipping %s (inactive)" % row['B_name'])
 				inact = inact + 1
-	print "%d friends in imported list" % (idx+1)
-	print "%d ready for scanning (%d inactive)" % (idx-inact+1, inact)
+	print("%d friends in imported list" % (idx+1))
+	print("%d ready for scanning (%d inactive)" % (idx-inact+1, inact))
 
 	return myfriends
 
@@ -76,7 +82,7 @@ def load_csv(filename):
 def scrape_1st_degrees():
 	#Prep CSV Output File
 	csvOut = '1st-degree_%s.csv' % now.strftime("%Y-%m-%d_%H%M")
-	writer = csv.writer(open(csvOut, 'wb'))
+	writer = csv.writer(open(csvOut, 'w'))
 	writer.writerow(['A_id','A_name','B_id','B_name','active'])
 
 	#Get your unique Facebook ID
@@ -84,7 +90,7 @@ def scrape_1st_degrees():
 	myid = profile_icon.get_attribute("id")[19:]
 
 	#Scan your Friends page (1st-degree connections)
-	print "Opening Friends page..."
+	print("Opening Friends page...")
 	browser.get("https://www.facebook.com/" + myid + "/friends")
 	scroll_to_bottom()
 	myfriends = scan_friends()
@@ -93,19 +99,19 @@ def scrape_1st_degrees():
 	for friend in myfriends:
 			writer.writerow([myid,"Me",friend['id'],friend['name'],friend['active']])
 
-	print "Successfully saved to %s" % csvOut
+	print("Successfully saved to %s" % csvOut)
 
 # --------------- Scrape 2nd degree connections. ---------------
 #This can take several days if you have a lot of friends!!
 def scrape_2nd_degrees():
 	#Prep CSV Output File
 	csvOut = '2nd-degree_%s.csv' % now.strftime("%Y-%m-%d_%H%M")
-	writer = csv.writer(open(csvOut, 'wb'))
+	writer = csv.writer(open(csvOut, 'w'))
 	writer.writerow(['A_id', 'B_id', 'A_name','B_name','active'])
 
 	#Load friends from CSV Input File
 	script, filename = argv
-	print "Loading list from %s..." % filename
+	print("Loading list from %s..." % filename)
 	myfriends = load_csv(filename)
 
 	for idx,friend in enumerate(myfriends):
@@ -114,26 +120,21 @@ def scrape_2nd_degrees():
 		browser.get(scrape_url)
 
 		#Scan your friends' Friends page (2nd-degree connections)
-		print "%d) %s" % (idx+1, scrape_url)
+		print("%d) %s" % (idx+1, scrape_url))
 		scroll_to_bottom()
 		their_friends = scan_friends()
 
 		#Write connections to CSV File
-		print 'Writing connections to CSV...'
+		print('Writing connections to CSV...')
 		for person in their_friends:
 			writer.writerow([friend['uid'],person['id'],friend['name'],person['name'],person['active']])
 
 # --------------- Start Scraping ---------------
 now = datetime.now()
-
 fb_login()
-
 if len(argv) is 1:
 	scrape_1st_degrees()
-
 elif len(argv) is 2:
 	scrape_2nd_degrees()
-	
 else:
-	print "Invalid # of arguments specified. Use none to scrape your 1st degree connections, or specify the name of the CSV file as the first argument."
-
+	print("Invalid # of arguments specified. Use none to scrape your 1st degree connections, or specify the name of the CSV file as the first argument.")
