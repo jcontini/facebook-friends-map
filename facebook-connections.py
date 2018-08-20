@@ -16,7 +16,7 @@ browser = webdriver.Chrome(chrome_options=wd_options)
 def fb_login():
 	print("Opening browser...")
 	browser.get("https://www.facebook.com/")
-	a = input("Please log into facebook and press enter after the page loads...")
+	a = raw_input("Please log into facebook and press enter after the page loads...")
 
 # --------------- Scroll to bottom of page -----------------
 def scroll_to_bottom():
