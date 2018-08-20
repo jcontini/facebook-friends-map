@@ -5,6 +5,8 @@ from datetime import datetime
 from sys import argv
 print("\n" * 100)
 
+os.environ["DEBUSSY"] = "1"
+
 # Configure browser session
 wd_options = Options()
 wd_options.add_argument("--disable-notifications")
@@ -60,7 +62,7 @@ def scan_friends():
 def load_csv(filename):
 	inact = 0
 	myfriends = []
-	with open(filename, 'r') as input_csv:
+	with open(filename, 'rb') as input_csv:
 		reader = csv.DictReader(input_csv)
 		for idx,row in enumerate(reader):
 			if row['active'] is '1':
