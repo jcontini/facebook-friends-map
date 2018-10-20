@@ -20,16 +20,27 @@ def fb_login():
 
 # --------------- Scroll to bottom of page -----------------
 def scroll_to_bottom():
-	print("Scrolling to bottom...")
-	while True:
-			try:
-				browser.find_element_by_class_name('_4khu') # class after friend's list
-				print("Reached end!")
-				break
-			except:
-				browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-				time.sleep(0.25)
-				pass
+    print("Scrolling to bottom...")
+    last_height=-1
+    sleeps=0
+    while True:
+            # if bowser does not grow for a minute also break
+            height = browser.execute_script("return document.body.scrollHeight")
+            if  last_height == height :
+                print("%d steps, Blocked! at size %d" % (sleeps, last_height))
+                if  sleeps >100 :   #25 seconds 
+                    break
+            last_height = height
+            try:
+                browser.find_element_by_class_name('_4khu') # class after friend's list
+                print("Reached end!")
+                break
+            except:
+                browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(0.25)
+                sleeps+=1
+                pass
+
 
 # --------------- Get list of all friends on page ---------------
 def scan_friends():
