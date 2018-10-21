@@ -1,3 +1,2 @@
 selenium
-wget
-piexif
+chromedriver-installer
