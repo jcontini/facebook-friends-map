@@ -1,3 +1,7 @@
-*.csv
-*.log
+.*
+db
 *.json
+*.log
+*.csv
+*.ipynb
+*.lock
