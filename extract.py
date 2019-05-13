@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 
 import argparse, json, os, glob, time, sys, pandas as pd
@@ -37,23 +37,7 @@ except:
     print('Script is running from shell')
 
 
-# In[2]:
-
-
-def analytics():
-    with open(db_index) as f:
-        friends_list = json.load(f)
-    detail_files = sorted(glob.glob(profiles_dir + '*.html'), key=os.path.getmtime)
-    
-    print('-- Startup check --')
-    print('# Friends: %s' % len(friends_list))
-    print('# Profile Files: %s' % len(detail_files))
-    print('# Profiles parsed: %s' % len(db_profiles))
-    print('# Remaining files: %s' % (len(friends_list)-len(detail_files)))
-    print('-'*20)
-
-
-# In[3]:
+# In[ ]:
 
 
 def start_browser():
@@ -71,10 +55,10 @@ def start_browser():
     return browser
 
 
-# In[4]:
+# In[ ]:
 
 
-def sign_in(browser):
+def sign_in():
     #Sign in
     fb_start_page = 'https://m.facebook.com/'
     if os.getenv('fb_pass', None):
@@ -93,10 +77,10 @@ def sign_in(browser):
     time.sleep(3)
 
 
-# In[5]:
+# In[ ]:
 
 
-def download_friends(browser):
+def download_friends():
     browser.get("https://m.facebook.com/me/friends")
     time.sleep(3)
     print('Scrolling to bottom...')
@@ -111,10 +95,10 @@ def download_friends(browser):
         print('%s) Downloaded' % friends_html)
 
 
-# In[6]:
+# In[ ]:
 
 
-def index_friends(browser):
+def index_friends():
     print('Indexing friends list...')    
     data = []
     browser.get('file:///' + os.getcwd() + '/' + friends_html)
@@ -126,7 +110,6 @@ def index_friends(browser):
         info = json.loads(browser.find_element_by_xpath(b+'div[2]/div[1]/div[2]/div[3]').get_attribute('data-store'))
         alias = '' if info['is_deactivated'] else browser.find_element_by_xpath(b+'div[2]/div[1]/*[1]/a').get_attribute('href')[8:]
         d = {
-            'num': i,
             'id': info['id'],
             'name': browser.find_element_by_xpath(b+'div[2]/div[1]/*[1]/a').text,
             'is_deactivated': info['is_deactivated'],
@@ -137,15 +120,15 @@ def index_friends(browser):
         print('%s) %s' % (i,d['name']))
         data.append(d)
 
-        with open(db_index, 'w') as f:
-            json.dump(data, f, indent=4)
+    with open(db_index, 'w') as f:
+        json.dump(data, f, indent=4)
     print('Indexed %s friends to %s' % (i,db_index))
 
 
-# In[7]:
+# In[ ]:
 
 
-def download_profiles(browser):
+def download_profiles():
     print('Downloading profiles from index...')
     with open(db_index, 'r') as f:
         data = json.load(f)
@@ -169,7 +152,7 @@ def download_profiles(browser):
                         print(' // Downloaded to %s' % fname)
 
 
-# In[8]:
+# In[ ]:
 
 
 def parse_profiles():
@@ -270,10 +253,26 @@ def parse_profiles():
             with open(db_profiles, 'w') as f:
                 json.dump(profiles, f, indent=2)
             
-    print('Indexed %s friends to %s' % (i,db_profiles))
+    print('Indexed %s friends to %s' % (i,db_profiles)) #update how it counts
 
 
-# In[9]:
+# In[ ]:
+
+
+def analytics():
+    with open(db_index) as f:
+        friends_list = json.load(f)
+    detail_files = sorted(glob.glob(profiles_dir + '*.html'), key=os.path.getmtime)
+    
+    print('-- Startup check --')
+    print('# Friends: %s' % len(friends_list))
+    print('# Profile Files: %s' % len(detail_files))
+    print('# Profiles parsed: %s' % len(db_profiles))
+    print('# Remaining files: %s' % (len(friends_list)-len(detail_files)))
+    print('-'*20)
+
+
+# In[ ]:
 
 
 def json2csv():
@@ -283,32 +282,43 @@ def json2csv():
     print('Saved to db/index'+ts+'.csv')
 
 
-# In[10]:
+# In[ ]:
 
 
 if is_nb:
-    browser = start_browser()
-    parse_profiles()
+    print('Running notebook stuff')
+    #browser = start_browser()
+    #parse_profiles()
 
 
-# In[11]:
+# In[ ]:
 
 
 if __name__ == '__main__' and is_nb == 0:
     parser = argparse.ArgumentParser(description='Facebook friends profile exporter')
     parser.add_argument('--index', action='store_true', help='Index friends list')
     parser.add_argument('--download', action='store_true', help='Download friends profiles')
+    parser.add_argument('--parse', action='store_true', help='Parse profiles to JSON')
 
     args = parser.parse_args()
+    browser = start_browser()
     try:
-        browser = start_browser()
-        if args.download:
+        if args.index:
+            sign_in()
+            download_friends()
+            index_friends()
+        elif args.download:
+            sign_in()
             download_profiles()
+        elif args.parse:
+            parse_profiles()
         else:
             sign_in(browser)
-            download_friends(browser)
-            if not args.index:
-                download_profiles()
+            download_friends()
+            index_friends()
+            download_profiles()
+            parse_profiles()
+
     except KeyboardInterrupt:
         print('\nThanks for using the script! Please raise any issues at https://github.com/jcontini/facebook-scraper/issues.')
         pass
