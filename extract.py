@@ -304,6 +304,7 @@ def geocode_locations():
     url_base = 'https://api.mapbox.com/geocoding/v5/mapbox.places/'
     api_token = os.getenv('mapbox_token')
     print('Geocoding locations from profiles...')
+    geos = []
     for location in unique_locs:
         r = requests.get(url_base + location + '.json',
          params={
@@ -312,14 +313,20 @@ def geocode_locations():
          })
         coordinates = r.json()['features'][0]['geometry']['coordinates']
         print('%s : %s' % (location ,coordinates))
+        geos.append({location:coordinates})
         print('-'*20)
-        
-    #geocoded_ids = []
-    #with open(db_geo,'w') as f:
-    #    json.dump(locations, f, indent=4)
-    #print('Indexed %s locations to %s' % (len(locations),db_loc))
     
-geocode_locations()
+    with open(db_geo,'w') as f:
+        json.dump(geos, f, indent=4)
+    print('Indexed %s coordinates to %s' % (len(geos),db_geo))
+    
+#geocode_locations()
+
+
+# In[ ]:
+
+
+
 
 
 # ## Misc Tools
