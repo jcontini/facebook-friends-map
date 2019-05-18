@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[1]:
 
 
 import argparse, json, os, glob, time, sys, pandas as pd
@@ -37,7 +37,9 @@ except:
     print('Script is running from shell')
 
 
-# In[ ]:
+# ## Extract data from Facebook
+
+# In[2]:
 
 
 def start_browser():
@@ -55,7 +57,7 @@ def start_browser():
     return browser
 
 
-# In[ ]:
+# In[3]:
 
 
 def sign_in():
@@ -77,7 +79,7 @@ def sign_in():
     time.sleep(3)
 
 
-# In[ ]:
+# In[4]:
 
 
 def download_friends():
@@ -95,7 +97,7 @@ def download_friends():
         print('%s) Downloaded' % friends_html)
 
 
-# In[ ]:
+# In[5]:
 
 
 def index_friends():
@@ -125,7 +127,7 @@ def index_friends():
     print('Indexed %s friends to %s' % (i,db_index))
 
 
-# In[ ]:
+# In[6]:
 
 
 def download_profiles():
@@ -152,7 +154,7 @@ def download_profiles():
                         print(' // Downloaded to %s' % fname)
 
 
-# In[ ]:
+# In[7]:
 
 
 def parse_profiles():
@@ -256,7 +258,70 @@ def parse_profiles():
     print('Indexed %s friends to %s' % (i,db_profiles)) #update how it counts
 
 
-# In[ ]:
+# ## Prepare data for mapping
+
+# In[58]:
+
+
+db_loc = 'db/locations.json'
+if not os.path.exists(db_loc):
+    with open(db_loc,'w') as f:
+        f.write("[]")
+
+def index_locations():
+    with open(db_profiles) as f:
+        profiles = json.load(f)
+    profile_locations = []
+    for i,r in enumerate(profiles):
+        a = None
+        details = {}
+        for line in r['details']:
+            print(line + line)
+            a = line.get('Address',a)
+            a = line.get('Current City',a)
+        if a:
+            print('%s) %s (# %s) // ' % (i+1,r['name'],r['id']),end="",flush=True)
+            print(a)
+            profile_locations.append(a)
+    
+    locations = list(set(profile_locations))
+    print(locations)
+    
+def geocode_locations():
+    print('Geocoding locations from profiles...')
+    geocoded_ids = []
+
+
+# # Exec
+
+# In[59]:
+
+
+index_locations()
+
+
+# ## Misc Tools
+
+# In[10]:
+
+
+if is_nb:
+    print('Running notebook stuff')
+    #browser = start_browser()
+    #parse_profiles()
+
+
+# In[11]:
+
+
+def json2csv():
+    #Convert index JSON to CSV
+    df = pd.read_json(db_index)
+    df.to_csv('db/index'+ts+'.csv')
+    print('Saved to db/index'+ts+'.csv')
+
+
+# In[12]:
 
 
 def analytics():
@@ -272,26 +337,9 @@ def analytics():
     print('-'*20)
 
 
-# In[ ]:
+# ## Shell application
 
-
-def json2csv():
-    #Convert index JSON to CSV
-    df = pd.read_json(db_index)
-    df.to_csv('db/index'+ts+'.csv')
-    print('Saved to db/index'+ts+'.csv')
-
-
-# In[ ]:
-
-
-if is_nb:
-    print('Running notebook stuff')
-    #browser = start_browser()
-    #parse_profiles()
-
-
-# In[ ]:
+# In[13]:
 
 
 if __name__ == '__main__' and is_nb == 0:
