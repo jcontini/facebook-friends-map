@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 
-import argparse, json, os, glob, time, sys, pandas as pd
+import argparse, json, os, glob, time, sys, requests, pandas as pd
 from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
 from selenium.common import exceptions
@@ -15,13 +15,12 @@ friends_html = 'db/index.html'
 profiles_dir = 'db/profiles/'
 db_index = 'db/index.json'
 db_profiles = 'db/profiles.json'
+db_loc = 'db/locations.json'
+db_geo = 'db/geo.json'
 
 #Set up & check environment
 if not os.path.exists(profiles_dir):
     os.makedirs(profiles_dir)
-if not os.path.exists(db_index):
-    with open(db_index,'w') as f:
-        f.write("{}")
 if not os.path.exists(db_profiles):
     with open(db_profiles,'w') as f:
         f.write("{}")
@@ -39,7 +38,7 @@ except:
 
 # ## Extract data from Facebook
 
-# In[2]:
+# In[ ]:
 
 
 def start_browser():
@@ -57,7 +56,7 @@ def start_browser():
     return browser
 
 
-# In[3]:
+# In[ ]:
 
 
 def sign_in():
@@ -79,7 +78,7 @@ def sign_in():
     time.sleep(3)
 
 
-# In[4]:
+# In[ ]:
 
 
 def download_friends():
@@ -97,7 +96,7 @@ def download_friends():
         print('%s) Downloaded' % friends_html)
 
 
-# In[5]:
+# In[ ]:
 
 
 def index_friends():
@@ -127,7 +126,7 @@ def index_friends():
     print('Indexed %s friends to %s' % (i,db_index))
 
 
-# In[6]:
+# In[ ]:
 
 
 def download_profiles():
@@ -154,7 +153,7 @@ def download_profiles():
                         print(' // Downloaded to %s' % fname)
 
 
-# In[7]:
+# In[ ]:
 
 
 def parse_profiles():
@@ -260,49 +259,72 @@ def parse_profiles():
 
 # ## Prepare data for mapping
 
-# In[58]:
+# In[ ]:
 
-
-db_loc = 'db/locations.json'
-if not os.path.exists(db_loc):
-    with open(db_loc,'w') as f:
-        f.write("[]")
 
 def index_locations():
     with open(db_profiles) as f:
         profiles = json.load(f)
-    profile_locations = []
-    for i,r in enumerate(profiles):
-        a = None
-        details = {}
-        for line in r['details']:
-            print(line + line)
-            a = line.get('Address',a)
-            a = line.get('Current City',a)
-        if a:
-            print('%s) %s (# %s) // ' % (i+1,r['name'],r['id']),end="",flush=True)
-            print(a)
-            profile_locations.append(a)
+    locations = []
+    for idx,r in enumerate(profiles):
+        print('%s) %s (%s): ' % (idx+1,r['name'],r['id']),end="",flush=True)
+        loc = ''
+        for i,d in enumerate(r['details']):
+            if d.get('Address'):
+                loc = d.get('Address')
+        for i,d in enumerate(r['details']):
+            if d.get('Current City'):
+                loc = d.get('Current City')  
+        if loc:
+            d = {
+                'id': r['id'],
+                'name': r['name'],
+                'location': loc
+            }
+            print(d['location'])
+            locations.append(d)
+        else:
+            print('(no location)')
     
-    locations = list(set(profile_locations))
-    print(locations)
-    
+    with open(db_loc,'w') as f:
+        json.dump(locations, f, indent=4)
+    print('Indexed %s friends locations to %s' % (len(locations),db_loc))
+
+
+# In[ ]:
+
+
 def geocode_locations():
+    with open(db_loc) as f:
+        data = json.load(f)
+    locations = []
+    for i,r in enumerate(data):
+        locations.append(r['location'])
+    unique_locs = list(set(locations))
+    url_base = 'https://api.mapbox.com/geocoding/v5/mapbox.places/'
+    api_token = os.getenv('mapbox_token')
     print('Geocoding locations from profiles...')
-    geocoded_ids = []
-
-
-# # Exec
-
-# In[59]:
-
-
-index_locations()
+    for location in unique_locs:
+        r = requests.get(url_base + location + '.json',
+         params={
+             'access_token': api_token,
+             'limit': 1
+         })
+        coordinates = r.json()['features'][0]['geometry']['coordinates']
+        print('%s : %s' % (location ,coordinates))
+        print('-'*20)
+        
+    #geocoded_ids = []
+    #with open(db_geo,'w') as f:
+    #    json.dump(locations, f, indent=4)
+    #print('Indexed %s locations to %s' % (len(locations),db_loc))
+    
+geocode_locations()
 
 
 # ## Misc Tools
 
-# In[10]:
+# In[ ]:
 
 
 if is_nb:
@@ -311,7 +333,7 @@ if is_nb:
     #parse_profiles()
 
 
-# In[11]:
+# In[ ]:
 
 
 def json2csv():
@@ -321,7 +343,7 @@ def json2csv():
     print('Saved to db/index'+ts+'.csv')
 
 
-# In[12]:
+# In[ ]:
 
 
 def analytics():
@@ -339,7 +361,7 @@ def analytics():
 
 # ## Shell application
 
-# In[13]:
+# In[ ]:
 
 
 if __name__ == '__main__' and is_nb == 0:

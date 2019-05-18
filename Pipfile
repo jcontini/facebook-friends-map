@@ -9,6 +9,9 @@ pylint = "*"
 [packages]
 chromedriver-binary = "*"
 pandas = "*"
+requests = "*"
+jupyter = "*"
+selenium = "*"
 
 [requires]
 python_version = "3.7"
