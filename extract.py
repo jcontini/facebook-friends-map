@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# # Facebook profile export & map
+
+# In[1]:
 
 
 import argparse, json, os, glob, time, sys, requests, pandas as pd
@@ -9,14 +11,16 @@ from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
 from selenium.common import exceptions
 from datetime import datetime
+from mapboxgl.utils import *
+from mapboxgl.viz import *
 
-ts = datetime.now().strftime('%Y-%m-%d_%H%M')
 friends_html = 'db/index.html'
 profiles_dir = 'db/profiles/'
 db_index = 'db/index.json'
 db_profiles = 'db/profiles.json'
 db_loc = 'db/locations.json'
 db_geo = 'db/geo.json'
+mapbox_token = os.getenv('mapbox_token')
 
 #Set up & check environment
 if not os.path.exists(profiles_dir):
@@ -29,16 +33,15 @@ if not os.path.exists(db_profiles):
 try:
     get_ipython()
     is_nb = 1
-    print('Saving latest notebooks to Python...')
     get_ipython().system('jupyter nbconvert --to script *.ipynb')
 except:
     is_nb = 0
-    print('Script is running from shell')
+    print('[INFO] Script is running from shell')
 
 
-# ## Extract data from Facebook
+# ## Extract friends profiles from Facebook
 
-# In[ ]:
+# In[2]:
 
 
 def start_browser():
@@ -56,7 +59,7 @@ def start_browser():
     return browser
 
 
-# In[ ]:
+# In[3]:
 
 
 def sign_in():
@@ -78,7 +81,7 @@ def sign_in():
     time.sleep(3)
 
 
-# In[ ]:
+# In[4]:
 
 
 def download_friends():
@@ -96,7 +99,7 @@ def download_friends():
         print('%s) Downloaded' % friends_html)
 
 
-# In[ ]:
+# In[5]:
 
 
 def index_friends():
@@ -126,7 +129,7 @@ def index_friends():
     print('Indexed %s friends to %s' % (i,db_index))
 
 
-# In[ ]:
+# In[6]:
 
 
 def download_profiles():
@@ -153,7 +156,7 @@ def download_profiles():
                         print(' // Downloaded to %s' % fname)
 
 
-# In[ ]:
+# In[7]:
 
 
 def parse_profiles():
@@ -257,9 +260,9 @@ def parse_profiles():
     print('Indexed %s friends to %s' % (i,db_profiles)) #update how it counts
 
 
-# ## Prepare data for mapping
+# ## Geocode locations
 
-# In[ ]:
+# In[8]:
 
 
 def index_locations():
@@ -291,7 +294,7 @@ def index_locations():
     print('Indexed %s friends locations to %s' % (len(locations),db_loc))
 
 
-# In[ ]:
+# In[9]:
 
 
 def geocode_locations():
@@ -302,13 +305,12 @@ def geocode_locations():
         locations.append(r['location'])
     unique_locs = list(set(locations))
     url_base = 'https://api.mapbox.com/geocoding/v5/mapbox.places/'
-    api_token = os.getenv('mapbox_token')
     print('Geocoding locations from profiles...')
     geos = []
     for location in unique_locs:
         r = requests.get(url_base + location + '.json',
          params={
-             'access_token': api_token,
+             'access_token': mapbox_token,
              'limit': 1
          })
         coordinates = r.json()['features'][0]['geometry']['coordinates']
@@ -319,56 +321,82 @@ def geocode_locations():
     with open(db_geo,'w') as f:
         json.dump(geos, f, indent=4)
     print('Indexed %s coordinates to %s' % (len(geos),db_geo))
-    
-#geocode_locations()
 
 
-# In[ ]:
+# In[10]:
 
 
+def geocode_friends():
+    with open(db_loc) as f:
+        friends = json.load(f)
+    with open(db_geo) as f:
+        geo = json.load(f)
+    geo_dict = {}
+    for loc in geo:
+        for k,v in loc.items():
+            geo_dict[k] = v
+    for i,friend in enumerate(friends):
+        friend['coordinates'] = geo_dict[friend['location']]
+        print('%s) %s // %s' %(i,friend['name'],friend['coordinates']))
+    with open(db_loc,'w') as f:
+        json.dump(friends, f, indent=2)
+    print('Added coordinates for %s friends!' % len(friends))
 
 
+# # Create Map
 
-# ## Misc Tools
-
-# In[ ]:
-
-
-if is_nb:
-    print('Running notebook stuff')
-    #browser = start_browser()
-    #parse_profiles()
+# In[11]:
 
 
-# In[ ]:
+def make_map():
+    with open(db_loc) as f:
+        friends = json.load(f)
+    for friend in friends:
+        friend['lat'] = friend['coordinates'][1]
+        friend['lon'] = friend['coordinates'][0]
+
+    with open(db_loc,'w') as f:
+        json.dump(friends, f, indent=2)
+
+    df = pd.read_json(db_loc)
+    del df['coordinates']
+    geojson = df_to_geojson(df,filename='points.geojson',
+                  properties=['name','location','id'],
+                  lat='lat', lon='lon', precision=3)
+
+    viz = CircleViz('points.geojson',
+        access_token=mapbox_token,
+        height='500px',
+        radius=4,
+        color_default='blue',
+        center = (-95, 40),
+        zoom = 2,
+        below_layer = 'waterway-label'
+        )
+
+    with open('viz.html', 'w') as f:
+        f.write(viz.create_html())
+    print('Saved map to viz.html! Remember to start local server first with "python -m http.server 80"')
+
+    #https://labs.mapbox.com/labs/jupyter/
+make_map()
+
+
+# ## Analytics
+
+# In[12]:
 
 
 def json2csv():
     #Convert index JSON to CSV
     df = pd.read_json(db_index)
-    df.to_csv('db/index'+ts+'.csv')
-    print('Saved to db/index'+ts+'.csv')
-
-
-# In[ ]:
-
-
-def analytics():
-    with open(db_index) as f:
-        friends_list = json.load(f)
-    detail_files = sorted(glob.glob(profiles_dir + '*.html'), key=os.path.getmtime)
-    
-    print('-- Startup check --')
-    print('# Friends: %s' % len(friends_list))
-    print('# Profile Files: %s' % len(detail_files))
-    print('# Profiles parsed: %s' % len(db_profiles))
-    print('# Remaining files: %s' % (len(friends_list)-len(detail_files)))
-    print('-'*20)
+    df.to_csv('db/index.csv')
+    print('Saved to db/index.csv')
 
 
 # ## Shell application
 
-# In[ ]:
+# In[13]:
 
 
 if __name__ == '__main__' and is_nb == 0:
@@ -376,6 +404,8 @@ if __name__ == '__main__' and is_nb == 0:
     parser.add_argument('--index', action='store_true', help='Index friends list')
     parser.add_argument('--download', action='store_true', help='Download friends profiles')
     parser.add_argument('--parse', action='store_true', help='Parse profiles to JSON')
+    parser.add_argument('--geocode', action='store_true', help='Geocode addresses to coordinates')
+    parser.add_argument('--map', action='store_true', help='Make the map!')
 
     args = parser.parse_args()
     browser = start_browser()
@@ -389,12 +419,22 @@ if __name__ == '__main__' and is_nb == 0:
             download_profiles()
         elif args.parse:
             parse_profiles()
+        elif args.geocode:
+            index_locations()
+            geocode_locations()
+            geocode_friends()
+        elif args.map:
+            make_map()
         else:
             sign_in(browser)
             download_friends()
             index_friends()
             download_profiles()
             parse_profiles()
+            index_locations()
+            geocode_locations()
+            geocode_friends()
+            make_map()
 
     except KeyboardInterrupt:
         print('\nThanks for using the script! Please raise any issues at https://github.com/jcontini/facebook-scraper/issues.')

@@ -4,3 +4,5 @@ db
 *.log
 *.csv
 *.lock
+*.geojson
+*.html

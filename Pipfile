@@ -12,6 +12,7 @@ pandas = "*"
 requests = "*"
 jupyter = "*"
 selenium = "*"
+mapboxgl = "*"
 
 [requires]
 python_version = "3.7"
