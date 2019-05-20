@@ -6,3 +6,4 @@ db
 *.lock
 *.geojson
 *.html
+*.ipynb

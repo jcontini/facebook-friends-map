@@ -3,10 +3,10 @@
 
 # # Facebook profile export & map
 
-# In[1]:
+# In[ ]:
 
 
-import argparse, json, os, glob, time, sys, requests, pandas as pd
+import argparse, json, os, glob, time, sys, requests, wget, urllib, pandas as pd
 from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
 from selenium.common import exceptions
@@ -21,6 +21,7 @@ db_profiles = 'db/profiles.json'
 db_loc = 'db/locations.json'
 db_geo = 'db/geo.json'
 mapbox_token = os.getenv('mapbox_token')
+
 
 #Set up & check environment
 if not os.path.exists(profiles_dir):
@@ -41,7 +42,7 @@ except:
 
 # ## Extract friends profiles from Facebook
 
-# In[2]:
+# In[ ]:
 
 
 def start_browser():
@@ -59,7 +60,7 @@ def start_browser():
     return browser
 
 
-# In[3]:
+# In[ ]:
 
 
 def sign_in():
@@ -81,7 +82,7 @@ def sign_in():
     time.sleep(3)
 
 
-# In[4]:
+# In[ ]:
 
 
 def download_friends():
@@ -99,11 +100,16 @@ def download_friends():
         print('%s) Downloaded' % friends_html)
 
 
-# In[5]:
+# In[ ]:
 
 
 def index_friends():
-    print('Indexing friends list...')    
+    with open(db_index) as f:
+        index = json.load(f)
+    already_parsed = []
+    for i,d in enumerate(index):
+        already_parsed.append(d['id'])
+    print('Indexing friends list...')
     data = []
     browser.get('file:///' + os.getcwd() + '/' + friends_html)
     base = '(//*[@class="_55wp _7om2 _5pxa"])'
@@ -112,24 +118,58 @@ def index_friends():
     for i in range(1,num_items+1):
         b = base + '['+str(i)+']/'
         info = json.loads(browser.find_element_by_xpath(b+'div[2]/div[1]/div[2]/div[3]').get_attribute('data-store'))
-        alias = '' if info['is_deactivated'] else browser.find_element_by_xpath(b+'div[2]/div[1]/*[1]/a').get_attribute('href')[8:]
-        d = {
-            'id': info['id'],
-            'name': browser.find_element_by_xpath(b+'div[2]/div[1]/*[1]/a').text,
-            'is_deactivated': info['is_deactivated'],
-            'alias': alias,
-            'photo_url': browser.find_element_by_xpath(b+'div[1]/a/i').get_attribute('style').split('("')[1].split('")')[0],
-            'mutual_friends': browser.find_element_by_xpath(b+'div[2]/div[1]/div[1]/div[1]/div[@data-sigil="m-add-friend-source-replaceable"]').text
-            }
-        print('%s) %s' % (i,d['name']))
-        data.append(d)
+        if info['id'] in already_parsed:
+            print('%s) // Already indexed , skipping...' % info['id'])
+        else:
+            alias = '' if info['is_deactivated'] else browser.find_element_by_xpath(b+'div[2]/div[1]/*[1]/a').get_attribute('href')[8:]
+            d = {
+                'id': info['id'],
+                'name': browser.find_element_by_xpath(b+'div[2]/div[1]/*[1]/a').text,
+                'is_deactivated': info['is_deactivated'],
+                'alias': alias,
+                'photo_url': browser.find_element_by_xpath(b+'div[1]/a/i').get_attribute('style').split('("')[1].split('")')[0],
+                'mutual_friends': browser.find_element_by_xpath(b+'div[2]/div[1]/div[1]/div[1]/div[@data-sigil="m-add-friend-source-replaceable"]').text
+                }
+            print('%s) %s' % (i,d['name']))
+            data.append(d)
 
-    with open(db_index, 'w') as f:
-        json.dump(data, f, indent=4)
+            with open(db_index, 'w') as f:
+                json.dump(data, f, indent=4)
     print('Indexed %s friends to %s' % (i,db_index))
 
 
-# In[6]:
+# In[ ]:
+
+
+#blah
+browser = start_browser()
+index_friends()
+
+
+# In[ ]:
+
+
+def pull_profile_pics():
+    print('Downloading profile photos...')
+    if not os.path.exists('db/pics/'):
+        os.makedirs('db/pics/')
+    with open(db_index) as f:
+        friends = json.load(f)
+    for i,d in enumerate(friends):
+        while True:
+            imgfile = 'db/pics/' + str(d['id'])+'.jpg'
+            try:
+                if not os.path.exists(imgfile):
+                    print('%s) %s (%s): ' % (i+1,d['name'],d['id']),end="",flush=True)
+                    wget.download(d['photo_url'],imgfile, False)
+                    print('Downloaded %s' % imgfile)
+                break
+            except (TimeoutError, urllib.error.URLError) as e:
+                print("Sleeping for a sec...")
+                time.sleep(1)
+
+
+# In[ ]:
 
 
 def download_profiles():
@@ -156,7 +196,7 @@ def download_profiles():
                         print(' // Downloaded to %s' % fname)
 
 
-# In[7]:
+# In[ ]:
 
 
 def parse_profiles():
@@ -262,7 +302,7 @@ def parse_profiles():
 
 # ## Geocode locations
 
-# In[8]:
+# In[ ]:
 
 
 def index_locations():
@@ -294,7 +334,7 @@ def index_locations():
     print('Indexed %s friends locations to %s' % (len(locations),db_loc))
 
 
-# In[9]:
+# In[ ]:
 
 
 def geocode_locations():
@@ -323,7 +363,7 @@ def geocode_locations():
     print('Indexed %s coordinates to %s' % (len(geos),db_geo))
 
 
-# In[10]:
+# In[ ]:
 
 
 def geocode_friends():
@@ -345,7 +385,7 @@ def geocode_friends():
 
 # # Create Map
 
-# In[11]:
+# In[ ]:
 
 
 def make_map():
@@ -363,28 +403,31 @@ def make_map():
     geojson = df_to_geojson(df,filename='points.geojson',
                   properties=['name','location','id'],
                   lat='lat', lon='lon', precision=3)
-
-    viz = CircleViz('points.geojson',
+    
+    color_stops = create_color_stops([1,10,50,100], colors='BrBG')
+    viz = ClusteredCircleViz('points.geojson',
         access_token=mapbox_token,
-        height='500px',
-        radius=4,
-        color_default='blue',
+        color_stops=color_stops,
+        radius_stops=[[1,5], [10, 10], [50, 15], [100, 20]],
+        radius_default=4,
+        cluster_maxzoom=10,
+        cluster_radius=30,
+        label_size=12,
         center = (-95, 40),
-        zoom = 2,
-        below_layer = 'waterway-label'
+        zoom = 2
         )
 
     with open('viz.html', 'w') as f:
         f.write(viz.create_html())
-    print('Saved map to viz.html! Remember to start local server first with "python -m http.server 80"')
+    print('Saved map to viz.html! Remember to start local server first.')
 
-    #https://labs.mapbox.com/labs/jupyter/
-make_map()
+#https://labs.mapbox.com/labs/jupyter/
+#https://github.com/mapbox/mapboxgl-jupyter/blob/master/docs/viz.md
 
 
 # ## Analytics
 
-# In[12]:
+# In[ ]:
 
 
 def json2csv():
@@ -396,7 +439,7 @@ def json2csv():
 
 # ## Shell application
 
-# In[13]:
+# In[ ]:
 
 
 if __name__ == '__main__' and is_nb == 0:
@@ -414,6 +457,7 @@ if __name__ == '__main__' and is_nb == 0:
             sign_in()
             download_friends()
             index_friends()
+            pull_profile_pics()
         elif args.download:
             sign_in()
             download_profiles()
@@ -426,7 +470,7 @@ if __name__ == '__main__' and is_nb == 0:
         elif args.map:
             make_map()
         else:
-            sign_in(browser)
+            sign_in()
             download_friends()
             index_friends()
             download_profiles()
