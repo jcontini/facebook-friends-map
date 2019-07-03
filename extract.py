@@ -3,7 +3,7 @@
 
 # # Facebook profile export & map
 
-# In[ ]:
+# In[18]:
 
 
 import argparse, json, os, glob, time, sys, requests, wget, urllib, pandas as pd
@@ -11,8 +11,6 @@ from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
 from selenium.common import exceptions
 from datetime import datetime
-from mapboxgl.utils import *
-from mapboxgl.viz import *
 
 friends_html = 'db/index.html'
 profiles_dir = 'db/profiles/'
@@ -21,7 +19,7 @@ db_profiles = 'db/profiles.json'
 db_loc = 'db/locations.json'
 db_geo = 'db/geo.json'
 mapbox_token = os.getenv('mapbox_token')
-
+db_geojson = "db/points.geojson"
 
 #Set up & check environment
 if not os.path.exists(profiles_dir):
@@ -105,12 +103,11 @@ def download_friends():
 
 def index_friends():
     with open(db_index) as f:
-        index = json.load(f)
+        data = json.load(f)
     already_parsed = []
-    for i,d in enumerate(index):
+    for i,d in enumerate(data):
         already_parsed.append(d['id'])
     print('Indexing friends list...')
-    data = []
     browser.get('file:///' + os.getcwd() + '/' + friends_html)
     base = '(//*[@class="_55wp _7om2 _5pxa"])'
     num_items = len(browser.find_elements_by_xpath(base))
@@ -119,7 +116,7 @@ def index_friends():
         b = base + '['+str(i)+']/'
         info = json.loads(browser.find_element_by_xpath(b+'div[2]/div[1]/div[2]/div[3]').get_attribute('data-store'))
         if info['id'] in already_parsed:
-            print('%s) // Already indexed , skipping...' % info['id'])
+            print('%s) // Already indexed %s, skipping...' % (i,info['id']))
         else:
             alias = '' if info['is_deactivated'] else browser.find_element_by_xpath(b+'div[2]/div[1]/*[1]/a').get_attribute('href')[8:]
             d = {
@@ -141,18 +138,8 @@ def index_friends():
 # In[ ]:
 
 
-#blah
-browser = start_browser()
-index_friends()
-
-
-# In[ ]:
-
-
 def pull_profile_pics():
     print('Downloading profile photos...')
-    if not os.path.exists('db/pics/'):
-        os.makedirs('db/pics/')
     with open(db_index) as f:
         friends = json.load(f)
     for i,d in enumerate(friends):
@@ -167,6 +154,7 @@ def pull_profile_pics():
             except (TimeoutError, urllib.error.URLError) as e:
                 print("Sleeping for a sec...")
                 time.sleep(1)
+    print('Done!')
 
 
 # In[ ]:
@@ -308,6 +296,8 @@ def parse_profiles():
 def index_locations():
     with open(db_profiles) as f:
         profiles = json.load(f)
+    with open(db_index) as f:
+        index = json.load(f)
     locations = []
     for idx,r in enumerate(profiles):
         print('%s) %s (%s): ' % (idx+1,r['name'],r['id']),end="",flush=True)
@@ -318,11 +308,16 @@ def index_locations():
         for i,d in enumerate(r['details']):
             if d.get('Current City'):
                 loc = d.get('Current City')  
+        for i,d in enumerate(index):
+            if r['id'] == d['id']:
+                photo = d['photo_url']
+            
         if loc:
             d = {
                 'id': r['id'],
                 'name': r['name'],
-                'location': loc
+                'location': loc,
+                'photo': photo
             }
             print(d['location'])
             locations.append(d)
@@ -385,7 +380,7 @@ def geocode_friends():
 
 # # Create Map
 
-# In[ ]:
+# In[15]:
 
 
 def make_map():
@@ -397,35 +392,24 @@ def make_map():
 
     with open(db_loc,'w') as f:
         json.dump(friends, f, indent=2)
-
-    df = pd.read_json(db_loc)
-    del df['coordinates']
-    geojson = df_to_geojson(df,filename='points.geojson',
-                  properties=['name','location','id'],
-                  lat='lat', lon='lon', precision=3)
+        
+    with open('template-map.html') as f:
+        newText=f.read().replace('YOUR_MAPBOX_TOKEN', mapbox_token)
+ 
+    with open('friends-map.html', "w") as f:
+        f.write(newText)
     
-    color_stops = create_color_stops([1,10,50,100], colors='BrBG')
-    viz = ClusteredCircleViz('points.geojson',
-        access_token=mapbox_token,
-        color_stops=color_stops,
-        radius_stops=[[1,5], [10, 10], [50, 15], [100, 20]],
-        radius_default=4,
-        cluster_maxzoom=10,
-        cluster_radius=30,
-        label_size=12,
-        center = (-95, 40),
-        zoom = 2
-        )
-
-    with open('viz.html', 'w') as f:
-        f.write(viz.create_html())
-    print('Saved map to viz.html! Remember to start local server first.')
-
-#https://labs.mapbox.com/labs/jupyter/
-#https://github.com/mapbox/mapboxgl-jupyter/blob/master/docs/viz.md
+    print('Saved map to friends-map.html!')
 
 
-# ## Analytics
+# ## Notebook Functions
+
+# In[16]:
+
+
+if is_nb:
+    make_map()
+
 
 # In[ ]:
 
@@ -439,7 +423,7 @@ def json2csv():
 
 # ## Shell application
 
-# In[ ]:
+# In[17]:
 
 
 if __name__ == '__main__' and is_nb == 0:
@@ -457,7 +441,6 @@ if __name__ == '__main__' and is_nb == 0:
             sign_in()
             download_friends()
             index_friends()
-            pull_profile_pics()
         elif args.download:
             sign_in()
             download_profiles()

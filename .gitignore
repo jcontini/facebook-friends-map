@@ -1,9 +1,9 @@
 .*
 db
+friends-map.html
 *.json
 *.log
 *.csv
 *.lock
 *.geojson
-*.html
 *.ipynb
