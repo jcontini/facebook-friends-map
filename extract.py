@@ -3,10 +3,10 @@
 
 # # Facebook profile export & map
 
-# In[18]:
+# In[1]:
 
 
-import argparse, json, os, glob, time, sys, requests, wget, urllib, pandas as pd
+import argparse, json, os, glob, time, sys, requests
 from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
 from selenium.common import exceptions
@@ -400,25 +400,6 @@ def make_map():
         f.write(newText)
     
     print('Saved map to friends-map.html!')
-
-
-# ## Notebook Functions
-
-# In[16]:
-
-
-if is_nb:
-    make_map()
-
-
-# In[ ]:
-
-
-def json2csv():
-    #Convert index JSON to CSV
-    df = pd.read_json(db_index)
-    df.to_csv('db/index.csv')
-    print('Saved to db/index.csv')
 
 
 # ## Shell application

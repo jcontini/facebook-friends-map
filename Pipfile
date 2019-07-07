@@ -8,12 +8,8 @@ pylint = "*"
 
 [packages]
 chromedriver-binary = "*"
-pandas = "*"
 requests = "*"
-jupyter = "*"
 selenium = "*"
-mapboxgl = "*"
-wget = "*"
 
 [requires]
 python_version = "3.7"
