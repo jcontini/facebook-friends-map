@@ -3,7 +3,7 @@
 
 # # Facebook profile export & map
 
-# In[1]:
+# In[2]:
 
 
 import argparse, json, os, glob, time, sys, requests
@@ -11,12 +11,13 @@ from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
 from selenium.common import exceptions
 from datetime import datetime
+from geojson import Feature, FeatureCollection, Point
 
 friends_html = 'db/index.html'
 profiles_dir = 'db/profiles/'
 db_index = 'db/index.json'
 db_profiles = 'db/profiles.json'
-db_loc = 'db/locations.json'
+db_friend_locations = 'db/friend_locations.json'
 db_geo = 'db/geo.json'
 mapbox_token = os.getenv('mapbox_token')
 db_geojson = "db/points.geojson"
@@ -133,28 +134,6 @@ def index_friends():
             with open(db_index, 'w') as f:
                 json.dump(data, f, indent=4)
     print('Indexed %s friends to %s' % (i,db_index))
-
-
-# In[ ]:
-
-
-def pull_profile_pics():
-    print('Downloading profile photos...')
-    with open(db_index) as f:
-        friends = json.load(f)
-    for i,d in enumerate(friends):
-        while True:
-            imgfile = 'db/pics/' + str(d['id'])+'.jpg'
-            try:
-                if not os.path.exists(imgfile):
-                    print('%s) %s (%s): ' % (i+1,d['name'],d['id']),end="",flush=True)
-                    wget.download(d['photo_url'],imgfile, False)
-                    print('Downloaded %s' % imgfile)
-                break
-            except (TimeoutError, urllib.error.URLError) as e:
-                print("Sleeping for a sec...")
-                time.sleep(1)
-    print('Done!')
 
 
 # In[ ]:
@@ -324,16 +303,16 @@ def index_locations():
         else:
             print('(no location)')
     
-    with open(db_loc,'w') as f:
+    with open(db_friend_locations,'w') as f:
         json.dump(locations, f, indent=4)
-    print('Indexed %s friends locations to %s' % (len(locations),db_loc))
+    print('Indexed %s friends locations to %s' % (len(locations),db_friend_locations))
 
 
 # In[ ]:
 
 
 def geocode_locations():
-    with open(db_loc) as f:
+    with open(db_friend_locations) as f:
         data = json.load(f)
     locations = []
     for i,r in enumerate(data):
@@ -346,6 +325,7 @@ def geocode_locations():
         r = requests.get(url_base + location + '.json',
          params={
              'access_token': mapbox_token,
+             'types': 'place,address',
              'limit': 1
          })
         coordinates = r.json()['features'][0]['geometry']['coordinates']
@@ -361,44 +341,40 @@ def geocode_locations():
 # In[ ]:
 
 
-def geocode_friends():
-    with open(db_loc) as f:
+def make_map():
+    #Open friends-locations list
+    with open(db_friend_locations) as f:
         friends = json.load(f)
+    #Open location-coordinates list
     with open(db_geo) as f:
-        geo = json.load(f)
+        locations = json.load(f)
     geo_dict = {}
-    for loc in geo:
-        for k,v in loc.items():
-            geo_dict[k] = v
+    for loc in locations:
+        for k_loc,v_coordinates in loc.items():
+            geo_dict[k_loc] = v_coordinates
+
+    features = []
     for i,friend in enumerate(friends):
-        friend['coordinates'] = geo_dict[friend['location']]
+        friend['coordinates'] = geo_dict[friend['location']] #Set friend coordinates based on location list
         print('%s) %s // %s' %(i,friend['name'],friend['coordinates']))
-    with open(db_loc,'w') as f:
-        json.dump(friends, f, indent=2)
+        features.append(Feature(
+                geometry = Point(friend['coordinates']),
+                properties = {
+                    'name': friend['name'],
+                    'location': friend['location'],
+                    'id': friend['id']
+                }
+            ))
+        collection = FeatureCollection(features)
+        with open(db_geojson, "w") as f:
+            f.write('%s' % collection)
+
     print('Added coordinates for %s friends!' % len(friends))
 
-
-# # Create Map
-
-# In[15]:
-
-
-def make_map():
-    with open(db_loc) as f:
-        friends = json.load(f)
-    for friend in friends:
-        friend['lat'] = friend['coordinates'][1]
-        friend['lon'] = friend['coordinates'][0]
-
-    with open(db_loc,'w') as f:
-        json.dump(friends, f, indent=2)
-        
     with open('template-map.html') as f:
         newText=f.read().replace('YOUR_MAPBOX_TOKEN', mapbox_token)
- 
     with open('friends-map.html', "w") as f:
         f.write(newText)
-    
     print('Saved map to friends-map.html!')
 
 
@@ -430,7 +406,6 @@ if __name__ == '__main__' and is_nb == 0:
         elif args.geocode:
             index_locations()
             geocode_locations()
-            geocode_friends()
         elif args.map:
             make_map()
         else:
@@ -441,7 +416,6 @@ if __name__ == '__main__' and is_nb == 0:
             parse_profiles()
             index_locations()
             geocode_locations()
-            geocode_friends()
             make_map()
 
     except KeyboardInterrupt:

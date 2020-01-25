@@ -10,6 +10,8 @@ pylint = "*"
 chromedriver-binary = "*"
 requests = "*"
 selenium = "*"
+geojson = "*"
+jupyter = "*"
 
 [requires]
 python_version = "3.7"

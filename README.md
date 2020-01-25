@@ -13,12 +13,12 @@ This tool will only extract the data that your friends have already explicitly m
 It works like this:
 1. Open your friends list page (on m.facebook.com), save it (index.html) create a list of all of your friends as `index.json`
 2. Download each of your friends profiles (on mbasic.facebook.com) and parse/organize all data as `profiles.json`
-3. Look for the 'Current City' and 'Address' fields on each profile and save them to `locations.json`.
-4. Geocode each unique location and add Latitude/Longitude to `locations.json`. It uses the Mapbox Geocoding API to do this, so you need a Mapbox API key. Be sure to either use pipenv environments with a `.env` file, or open the python file to manually put in your Mapbox API key.
-5. Creates a map! Using `template-map.html` as a base, the script will create `friends-map.html` with your Mapbox API key, and map out `locations.json` which is now enriched with geodata. The result is a moveable, searchable map as you see in the example screenshot.
+3. Look for the 'Current City' and 'Address' fields on each profile and save them to `friend_locations.json`.
+4. Geocode each unique location and add Latitude/Longitude to `points.geojson`. It uses the Mapbox Geocoding API to do this, so you need a Mapbox API key. Be sure to either use pipenv environments with a `.env` file, or open `extract.py` to manually put in your Mapbox API key.
+5. Creates `friends-map.html`, using `template-map.html` as the base and your Mapbox API key to render the map. The result is a moveable, searchable map of your friends all over the world!
  
 ## Installation
-You'll need to have python, pip, and [Google Chrome](https://www.google.com/chrome/) installed to use this tool. Once that's all set up:
+You'll need to have python, pipenv, and [Google Chrome](https://www.google.com/chrome/) installed to use this tool. Once that's all set up:
 
 1. Clone this repository
 2. `cd` into the cloned folder 
@@ -29,8 +29,6 @@ fb_user
 fb_pass
 mapbox_token
 ```
-
-I personally used Jupyter Notebook to run the script (you'll see the notebook file in the repo), but it's not required at all.
 
 ## Extract profile data & create the map
 1. Run `pipenv shell` to activate the virtual environment. This is optional if you already have the required packages installed in your environment.
