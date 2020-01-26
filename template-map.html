@@ -86,7 +86,7 @@
 </div>
 
 <script>
-mapboxgl.accessToken = 'YOUR_MAPBOX_TOKEN';
+mapboxgl.accessToken = '{{mapbox_token}}';
 var map = new mapboxgl.Map({
     container: 'map',
     attributionControl: false,
@@ -120,7 +120,7 @@ function renderListings(features) {
         features.forEach(function(feature) {
             var prop = feature.properties;
             var item = document.createElement('a');
-            item.href = prop.wikipedia;
+            item.href = 'https://www.facebook.com/profile.php?id=' + prop.id;
             item.target = '_blank';
             item.textContent = prop.name + ' (' + prop.location + ')';
             item.addEventListener('mouseover', function() {
@@ -172,7 +172,7 @@ map.on('style.load', function() {
 
     map.addSource("data", {
         "type": "geojson",
-        "data": "db/points.geojson",
+        "data": datapoints,
         "buffer": 1,
         "maxzoom": 14,
         "generateId": true
@@ -245,6 +245,9 @@ map.on('style.load', function() {
     // passing an empty array to render an empty state
     renderListings([]);
 });
+</script>
+<script>
+    var datapoints = {{datapoints}}
 </script>
 
 </body>

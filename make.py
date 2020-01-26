@@ -372,9 +372,11 @@ def make_map():
     print('Added coordinates for %s friends!' % len(friends))
 
     with open('template-map.html') as f:
-        newText=f.read().replace('YOUR_MAPBOX_TOKEN', mapbox_token)
+        html=f.read()
+        html=html.replace('{{mapbox_token}}', mapbox_token)
+        html=html.replace('{{datapoints}}', str(collection))
     with open('friends-map.html', "w") as f:
-        f.write(newText)
+        f.write(html)
     print('Saved map to friends-map.html!')
 
 
@@ -392,13 +394,14 @@ if __name__ == '__main__' and is_nb == 0:
     parser.add_argument('--map', action='store_true', help='Make the map!')
 
     args = parser.parse_args()
-    browser = start_browser()
     try:
         if args.index:
+            browser = start_browser()
             sign_in()
             download_friends()
             index_friends()
         elif args.download:
+            browser = start_browser()
             sign_in()
             download_profiles()
         elif args.parse:
@@ -409,6 +412,7 @@ if __name__ == '__main__' and is_nb == 0:
         elif args.map:
             make_map()
         else:
+            browser = start_browser()
             sign_in()
             download_friends()
             index_friends()

@@ -14,8 +14,8 @@ It works like this:
 1. Open your friends list page (on m.facebook.com), save it (index.html) create a list of all of your friends as `index.json`
 2. Download each of your friends profiles (on mbasic.facebook.com) and parse/organize all data as `profiles.json`
 3. Look for the 'Current City' and 'Address' fields on each profile and save them to `friend_locations.json`.
-4. Geocode each unique location and add Latitude/Longitude to `points.geojson`. It uses the Mapbox Geocoding API to do this, so you need a Mapbox API key. Be sure to either use pipenv environments with a `.env` file, or open `extract.py` to manually put in your Mapbox API key.
-5. Creates `friends-map.html`, using `template-map.html` as the base and your Mapbox API key to render the map. The result is a moveable, searchable map of your friends all over the world!
+4. Geocode each unique location and add Latitude/Longitude to `points.geojson`. It uses the Mapbox Geocoding API to do this, so you need a Mapbox API key. Be sure to either use pipenv environments with a `.env` file, or open `make.py` to manually put in your Mapbox API key.
+5. Creates `friends-map.html`, using `template-map.html` as the base and your Mapbox API key to render the map. The result is a moveable, searchable map of your friends all over the world! All the data is included in the html file, so you can open it on your computer without a server.
  
 ## Installation
 You'll need to have python, pipenv, and [Google Chrome](https://www.google.com/chrome/) installed to use this tool. Once that's all set up:
@@ -23,16 +23,11 @@ You'll need to have python, pipenv, and [Google Chrome](https://www.google.com/c
 1. Clone this repository
 2. `cd` into the cloned folder 
 3. Run `pipenv install` to install dependencies
-4. Create a `.env` file for pipenv and set these variables:
-```
-fb_user
-fb_pass
-mapbox_token
-```
+4. Open the `.env` file for pipenv set your variables (fb_user, fb_pass, mapbox_token)
 
 ## Extract profile data & create the map
 1. Run `pipenv shell` to activate the virtual environment. This is optional if you already have the required packages installed in your environment.
-2. Run `python extract.py` to run the full process of indexing, downloading, parsing, geocoding, and mapping your friends. You can optionally use any of these flags to perform only certain actions:
+2. Run `python make.py` to run the full process of indexing, downloading, parsing, geocoding, and mapping your friends. You can optionally use any of these flags to perform only certain actions:
 
 - `-- index` Sign in, create friends list index only
 - `-- download` Download profile for each friend in index
