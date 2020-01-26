@@ -7,3 +7,4 @@ friends-map.html
 *.lock
 *.geojson
 *.ipynb
+.env
