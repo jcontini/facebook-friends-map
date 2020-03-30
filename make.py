@@ -13,17 +13,13 @@ from selenium.common import exceptions
 from datetime import datetime
 from geojson import Feature, FeatureCollection, Point
 
-friends_html = 'db/index.html'
-profiles_dir = 'db/profiles/'
-db_index = 'db/index.json'
-db_profiles = 'db/profiles.json'
-db_friend_locations = 'db/friend_locations.json'
-db_geo = 'db/geo.json'
-mapbox_token = os.getenv('mapbox_token')
-db_geojson = "db/points.geojson"
-
-#Set up & check environment
-if not os.path.exists('.env'):
+#Set up environment
+if os.path.exists('.env'):
+    fb_user = os.getenv('fb_user')
+    fb_pass = os.getenv('fb_pass')
+    mapbox_token = os.getenv('mapbox_token')
+    print('Loaded credentials from .env file.')
+else:
     print("Welcome! Let's set up your environment. This will create a .env file in the same folder as this script, and set it up with your email, password, and Mapbox API Key. This is saved only on your device and only used to autofill the Facebook login form.\n")
 
     fb_user = input("Facebook Email Address: ")
@@ -39,8 +35,20 @@ if not os.path.exists('.env'):
 
     print("\nGreat! Details saved in .env, so you shouldn't need to do this again.\n")
 
+# Prepare database
+friends_html = 'db/index.html'
+profiles_dir = 'db/profiles/'
+db_index = 'db/index.json'
+db_profiles = 'db/profiles.json'
+db_friend_locations = 'db/friend_locations.json'
+db_geo = 'db/geo.json'
+db_geojson = "db/points.geojson"
+
 if not os.path.exists(profiles_dir):
     os.makedirs(profiles_dir)
+if not os.path.exists(db_index):
+    with open(db_index,'w') as f:
+        f.write("{}")
 if not os.path.exists(db_profiles):
     with open(db_profiles,'w') as f:
         f.write("{}")
@@ -105,29 +113,32 @@ def index_friends():
         already_parsed.append(d['id'])
     print('Indexing friends list...')
     browser.get('file:///' + os.getcwd() + '/' + friends_html)
-    base = '(//*[@class="_55wp _7om2 _5pxa"])'
+    base = '(//*[@data-sigil="undoable-action"])'
     num_items = len(browser.find_elements_by_xpath(base))
+    if num_items == 0:
+        print("\nWasn't able to parse friends index. This probably means that Facebook updated their template. \nPlease raise at https://github.com/jcontini/facebook-scraper/issues and I will try to update the script. \nOr if you can code, please submit a pull request instead :)\n")
+        sys.exit()
     print('Scanning %s friends...' % (num_items))
+    friends = []
     for i in range(1,num_items+1):
         b = base + '['+str(i)+']/'
-        info = json.loads(browser.find_element_by_xpath(b+'div[2]/div[1]/div[2]/div[3]').get_attribute('data-store'))
+        info = json.loads(browser.find_element_by_xpath(b+'/div[3]/div/div/div[3]').get_attribute('data-store'))
         if info['id'] in already_parsed:
             print('%s) // Already indexed %s, skipping...' % (i,info['id']))
         else:
-            alias = '' if info['is_deactivated'] else browser.find_element_by_xpath(b+'div[2]/div[1]/*[1]/a').get_attribute('href')[8:]
+            alias = '' if info['is_deactivated'] else browser.find_element_by_xpath(b+'/div[2]//a').get_attribute('href')[8:]
             d = {
                 'id': info['id'],
-                'name': browser.find_element_by_xpath(b+'div[2]/div[1]/*[1]/a').text,
+                'name': browser.find_element_by_xpath(b+'/div[2]//a').text,
                 'is_deactivated': info['is_deactivated'],
                 'alias': alias,
                 'photo_url': browser.find_element_by_xpath(b+'div[1]/a/i').get_attribute('style').split('("')[1].split('")')[0],
-                'mutual_friends': browser.find_element_by_xpath(b+'div[2]/div[1]/div[1]/div[1]/div[@data-sigil="m-add-friend-source-replaceable"]').text
                 }
             print('%s) %s' % (i,d['name']))
-            data.append(d)
+            friends.append(d)
 
             with open(db_index, 'w') as f:
-                json.dump(data, f, indent=4)
+                json.dump(friends, f, indent=4)
     print('Indexed %s friends to %s' % (i,db_index))
 
 
