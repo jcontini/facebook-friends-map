@@ -7,11 +7,10 @@ verify_ssl = true
 pylint = "*"
 
 [packages]
-chromedriver-binary = "*"
 requests = "*"
 selenium = "*"
 geojson = "*"
-jupyter = "*"
+chromedriver-binary = "*"
 
 [requires]
 python_version = "3.7"

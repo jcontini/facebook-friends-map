@@ -7,8 +7,8 @@
 
 
 import argparse, json, os, glob, time, sys, requests
-from selenium.webdriver import Chrome
-from selenium.webdriver.chrome.options import Options
+import chromedriver_binary
+from selenium.webdriver import Chrome, ChromeOptions
 from selenium.common import exceptions
 from datetime import datetime
 from geojson import Feature, FeatureCollection, Point
@@ -23,66 +23,62 @@ mapbox_token = os.getenv('mapbox_token')
 db_geojson = "db/points.geojson"
 
 #Set up & check environment
+if not os.path.exists('.env'):
+    print("Welcome! Let's set up your environment. This will create a .env file in the same folder as this script, and set it up with your email, password, and Mapbox API Key. This is saved only on your device and only used to autofill the Facebook login form.\n")
+
+    fb_user = input("Facebook Email Address: ")
+    fb_pass = input("Facebook Password: ")
+    print("\nTo plot your friends on a map, you need a (free) Mapbox API Key. If you don't already have one, follow instructions at https://docs.mapbox.com/help/glossary/access-token, then come back here to enter the access token\n")
+    mapbox_token = input("Mapbox access token: ")
+
+    f = open(".env","w+")
+    f.write('fb_user="' + fb_user + '"\n')
+    f.write('fb_pass="' + fb_pass + '"\n')
+    f.write('mapbox_token="' + mapbox_token + '"\n')
+    f.close()
+
+    print("\nGreat! Details saved in .env, so you shouldn't need to do this again.\n")
+
 if not os.path.exists(profiles_dir):
     os.makedirs(profiles_dir)
 if not os.path.exists(db_profiles):
     with open(db_profiles,'w') as f:
         f.write("{}")
 
-#Determine execution context
-try:
-    get_ipython()
-    is_nb = 1
-    get_ipython().system('jupyter nbconvert --to script *.ipynb')
-except:
-    is_nb = 0
-    print('[INFO] Script is running from shell')
-
-
 # ## Extract friends profiles from Facebook
 
 # In[ ]:
 
-
 def start_browser():
     #Setup browser
-    print("Opening Browser...")
-    options = Options()
+    options = ChromeOptions() 
     options.add_argument("--disable-notifications")
     options.add_argument("--disable-infobars")
     options.add_argument("--mute-audio")
     options.add_argument("--start-maximized")
-    #options.add_argument("headless")
     options.add_experimental_option("prefs",{"profile.managed_default_content_settings.images":2})
-    browser = Chrome(options=options)
 
+    print("Opening Browser...")    
+    browser = Chrome(options=options)
     return browser
 
-
 # In[ ]:
-
 
 def sign_in():
     #Sign in
     fb_start_page = 'https://m.facebook.com/'
-    if os.getenv('fb_pass', None):
-        fb_user = os.getenv('fb_user')
-        fb_pass = os.getenv('fb_pass')
-        print("Logging in %s automatically..." % fb_user)
-        browser.get(fb_start_page)
-        email_id = browser.find_element_by_id("m_login_email")
-        pass_id = browser.find_element_by_id("m_login_password")
-        email_id.send_keys(fb_user)
-        pass_id.send_keys(fb_pass)
-        pass_id.send_keys(u'\ue007')
-    else:
-        browser.get(fb_start_page)
-        input("Please log into facebook and press enter after the page loads...")
-    time.sleep(3)
+    print("Logging in %s automatically..." % fb_user)
+    browser.get(fb_start_page)
+    email_id = browser.find_element_by_id("m_login_email")
+    pass_id = browser.find_element_by_id("m_login_password")
+    email_id.send_keys(fb_user)
+    pass_id.send_keys(fb_pass)
+    pass_id.send_keys(u'\ue007')
+
+    time.sleep(2)
 
 
 # In[ ]:
-
 
 def download_friends():
     browser.get("https://m.facebook.com/me/friends")
@@ -100,7 +96,6 @@ def download_friends():
 
 
 # In[ ]:
-
 
 def index_friends():
     with open(db_index) as f:
@@ -144,7 +139,7 @@ def download_profiles():
     with open(db_index, 'r') as f:
         data = json.load(f)
     for i,d in enumerate(data):
-        print('%s) %s' % (i+1,d['name']),end="",flush=True)
+        print('%s) %s' % (i+1,d['name']), flush=True)
         if d['is_deactivated']:
             print(' // Skipped (Profile deactivated)')
         else:
@@ -385,7 +380,7 @@ def make_map():
 # In[17]:
 
 
-if __name__ == '__main__' and is_nb == 0:
+if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Facebook friends profile exporter')
     parser.add_argument('--index', action='store_true', help='Index friends list')
     parser.add_argument('--download', action='store_true', help='Download friends profiles')

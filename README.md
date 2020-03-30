@@ -17,8 +17,11 @@ It works like this:
 4. Geocode each unique location and add Latitude/Longitude to `points.geojson`. It uses the Mapbox Geocoding API to do this, so you need a Mapbox API key. Be sure to either use pipenv environments with a `.env` file, or open `make.py` to manually put in your Mapbox API key.
 5. Creates `friends-map.html`, using `template-map.html` as the base and your Mapbox API key to render the map. The result is a moveable, searchable map of your friends all over the world! All the data is included in the html file, so you can open it on your computer without a server.
  
+## Pre-requisites
+- Install the latest version of [Google Chrome Beta](https://www.google.com/chrome/beta/). This is because the script uses the latest version of the `chromedriver-binary`, which has to match the latest version of chrome.
+- Make sure that `python 3` and `pipenv` are installed.
+
 ## Installation
-You'll need to have python, pipenv, and [Google Chrome](https://www.google.com/chrome/) installed to use this tool. Once that's all set up:
 
 1. Clone this repository
 2. `cd` into the cloned folder 
