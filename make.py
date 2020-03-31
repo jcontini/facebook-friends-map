@@ -53,6 +53,8 @@ if not os.path.exists(db_profiles):
     with open(db_profiles,'w') as f:
         f.write("{}")
 
+signed_in = False
+
 # ## Extract friends profiles from Facebook
 
 # In[ ]:
@@ -73,7 +75,6 @@ def start_browser():
 # In[ ]:
 
 def sign_in():
-    #Sign in
     fb_start_page = 'https://m.facebook.com/'
     print("Logging in %s automatically..." % fb_user)
     browser.get(fb_start_page)
@@ -84,6 +85,7 @@ def sign_in():
     pass_id.send_keys(u'\ue007')
 
     time.sleep(2)
+    signed_in = True
 
 
 # In[ ]:
@@ -96,7 +98,6 @@ def download_friends():
     while browser.find_elements_by_css_selector('#m_more_friends'):
         browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         time.sleep(1)
-
     #Save friend list
     with open (friends_html, 'w') as f:
         f.write(browser.page_source)
@@ -139,7 +140,7 @@ def index_friends():
 
             with open(db_index, 'w') as f:
                 json.dump(friends, f, indent=4)
-    print('Indexed %s friends to %s' % (i,db_index))
+    print('Indexed %s friends to %s' % (num_items,db_index))
 
 
 # In[ ]:
@@ -147,6 +148,7 @@ def index_friends():
 
 def download_profiles():
     print('Downloading profiles from index...')
+    session_downloads = 0
     with open(db_index, 'r') as f:
         data = json.load(f)
     for i,d in enumerate(data):
@@ -159,7 +161,13 @@ def download_profiles():
                 print(" // Skipped (Already Exists): %s" % (fname))
             else:
                 browser.get('https://mbasic.facebook.com/profile.php?v=info&id='+str(d['id']))
+                session_downloads += 1
                 time.sleep(1)
+                if session_downloads == 45:
+                    print("Taking a voluntary break at " + str(session_downloads) + " profile downloads, to prevent triggering Facebook's alert systems. I recommend you quit (Ctrl-C or quit this window) to play it safe and try coming back tomorrow to space it out. \nOr, press enter to continue at your own risk.")
+                if browser.title == "You can't use this feature at the moment":
+                    print("\n***WARNING***\n\nFacebook detected abnormal activity, so this script is going play it safe and take a break.\n- As of March 2020, this seems to happen after downloading ~45 profiles in 1 session.\n- I recommend not running the script again until tomorrow.\n- Excessive use might cause Facebook to get more suspicious and possibly suspend your account.\n\nIf you have experience writing scrapers, please feel free to recommend ways to avoid triggering Facebook's detection system :) ")
+                    sys.exit(1)
                 if browser.find_elements_by_css_selector('#login_form') or browser.find_elements_by_css_selector('#mobile_login_bar'):
                     print('\nBrowser is not logged into facebook! Please run again to login & resume.')
                     sys.exit(1)
@@ -270,7 +278,7 @@ def parse_profiles():
             with open(db_profiles, 'w') as f:
                 json.dump(profiles, f, indent=2)
             
-    print('Indexed %s friends to %s' % (i,db_profiles)) #update how it counts
+    print('Indexed %s friends to %s' % (len(friends_list),db_profiles)) #update how it counts
 
 
 # ## Geocode locations
@@ -419,9 +427,14 @@ if __name__ == '__main__':
             make_map()
         else:
             browser = start_browser()
-            sign_in()
-            download_friends()
-            index_friends()
+            if not os.path.exists(db_index):
+                sign_in()
+                download_friends()
+                index_friends()
+            else:
+                print("Index already exists, proceeding to download profiles.\nIf you want to re-index, delete this file: " + db_index)
+            if signed_in == False:
+                sign_in()
             download_profiles()
             parse_profiles()
             index_locations()
