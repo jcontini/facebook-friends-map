@@ -64,7 +64,7 @@ def start_browser():
     options.add_argument("--mute-audio")
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-    #options.add_argument('--headless')
+    options.add_argument('--headless')
     options.add_experimental_option("prefs",{"profile.managed_default_content_settings.images":2})
 
     browser = Chrome(options=options)
@@ -78,11 +78,12 @@ def sign_in():
     browser.get(fb_start_page)
     email_id = browser.find_element_by_id("m_login_email")
     pass_id = browser.find_element_by_id("m_login_password")
+    confirm_id = browser.find_element_by_name("login")
     email_id.send_keys(fb_user)
     pass_id.send_keys(fb_pass)
-    pass_id.send_keys(u'\ue007')
+    confirm_id.click()
 
-    time.sleep(2)
+    time.sleep(3)
     return True
 
 
@@ -91,7 +92,7 @@ def sign_in():
 def download_friends():
     browser.get("https://m.facebook.com/me/friends")
     time.sleep(3)
-    print('Scrolling to bottom...')
+    print('Scrolling to bottom. Please wait, this takes ~1 min per 300 friends)...')
     #Scroll to bottom
     while browser.find_elements_by_css_selector('#m_more_friends'):
         browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
