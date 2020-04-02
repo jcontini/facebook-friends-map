@@ -18,7 +18,7 @@ if os.path.exists('.env'):
     fb_user = os.getenv('fb_user')
     fb_pass = os.getenv('fb_pass')
     mapbox_token = os.getenv('mapbox_token')
-    print('Loaded credentials from .env file.')
+    print('>> Loaded credentials from .env file.')
 else:
     print("Welcome! Let's set up your environment. This will create a .env file in the same folder as this script, and set it up with your email, password, and Mapbox API Key. This is saved only on your device and only used to autofill the Facebook login form.\n")
 
@@ -205,20 +205,21 @@ def parse_profiles():
 
     print('Parsing profile pages...')
     for i,r in enumerate(profile_files):
-        print('%s/%s) %s' % (i+1,len(profile_files),r),end="",flush=True)
-        if int(r.split('/')[-1].split('.')[0]) in already_parsed:
-            print(' // Already parsed, skipping...')
-        else:
+        profile_id = int(r.split('/')[-1].split('.')[0])
+        if not profile_id in already_parsed:
+            print('%s/%s) Profile #%s' % (i+1,len(profile_files),profile_id),end="",flush=True)
             profile_path = 'file://'+os.getcwd()+'/'+r
             browser.get(profile_path)
             x = browser.find_element_by_xpath
             xs = browser.find_elements_by_xpath
             d = {
-                'id': int(r.split('/')[-1].split('.')[0]),
+                'id': profile_id,
                 'name': browser.title,
-                'alias': x('//a/text()[. = "Timeline"][1]/..').get_attribute('href')[8:].split('?')[0]
+                'alias': x('//a/text()[. = "Timeline"][1]/..').get_attribute('href')[8:].split('?')[0],
+                'meta' : {
+                    'created': time.strftime('%Y-%m-%d', time.localtime(os.path.getctime(r))),
                 }
-            print(' // %s (%s)' % (d['name'],d['alias']))
+            }
             for k,v in sections.items():
                 try:
                     if 'src' in v:
@@ -276,6 +277,7 @@ def parse_profiles():
                 except exceptions.NoSuchElementException:
                     pass
             
+            print(' // %s (%s)' % (d['name'],d['alias']))
             profiles.append(d)
 
             try:
