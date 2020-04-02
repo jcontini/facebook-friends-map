@@ -53,6 +53,10 @@ if not os.path.exists(db_profiles):
     with open(db_profiles,'w') as f:
         f.write("[]")
 
+def db_save(db,data):
+    with open(db, 'w') as f:
+        json.dump(data, f, indent=2)
+
 # ## Extract friends profiles from Facebook
 
 # In[ ]:
@@ -176,8 +180,15 @@ def download_profiles():
 
 # In[ ]:
 
-
 def parse_profiles():
+    profiles = []
+    already_parsed = []
+    with open(db_profiles) as f:
+        profiles = json.load(f)
+    for i,profile in enumerate(profiles):
+        already_parsed.append(profile['id'])
+    profile_files = glob.glob(profiles_dir+'*.html')
+
     sections = {
         'photo_url': {'src':'//div[@id="objects_container"]//a/img[@alt][1]'},
         'tagline': {'txt':'//*[@id="root"]/div[1]/div[1]/div[2]/div[2]'},
@@ -191,29 +202,23 @@ def parse_profiles():
         'family': {'fam':'//*[@id="family"]/div/div[2]/div'},
         'life_events': {'years':'(//div[@id="year-overviews"]/div[1]/div[2]/div[1]/div/div[1])'}
     }
-    
-    with open(db_index) as f:
-        friends_list = json.load(f)
-    profiles = []
-    with open(db_profiles) as f:
-        profiles = json.load(f)
-    already_parsed = []
-    for i,profile in enumerate(profiles):
-        already_parsed.append(profile['id'])
+
     print('Parsing profile pages...')
-    for i,r in enumerate(friends_list):
-        print('%s/%s) %s' % (i+1,len(friends_list),r['name']),end="",flush=True)
-        if r['is_deactivated']:
-            print(' // Profile deactivated, skipping...')
-        elif r['id'] in already_parsed:
+    for i,r in enumerate(profile_files):
+        print('%s/%s) %s' % (i+1,len(profile_files),r),end="",flush=True)
+        if int(r.split('/')[-1].split('.')[0]) in already_parsed:
             print(' // Already parsed, skipping...')
         else:
-            d = {'id': r['id'],'name': r['name'],'alias': r['alias']}
-            profile = 'file://'+os.getcwd()+'/'+profiles_dir+str(d['id'])+'.html'
-            print(' // '+profile.split('/')[-1])
-            browser.get(profile)
+            profile_path = 'file://'+os.getcwd()+'/'+r
+            browser.get(profile_path)
             x = browser.find_element_by_xpath
             xs = browser.find_elements_by_xpath
+            d = {
+                'id': int(r.split('/')[-1].split('.')[0]),
+                'name': browser.title,
+                'alias': x('//a/text()[. = "Timeline"][1]/..').get_attribute('href')[8:].split('?')[0]
+                }
+            print(' // %s (%s)' % (d['name'],d['alias']))
             for k,v in sections.items():
                 try:
                     if 'src' in v:
@@ -273,10 +278,15 @@ def parse_profiles():
             
             profiles.append(d)
 
-            with open(db_profiles, 'w') as f:
-                json.dump(profiles, f, indent=2)
+            try:
+                db_save(db_profiles,profiles)
+            except KeyboardInterrupt:
+                print('Saving last record...')
+                db_save(db_profiles,profiles)
+                print('\nThanks for using the script! Please raise any issues at https://github.com/jcontini/facebook-scraper/issues.')
+                sys.exit()
             
-    print('Indexed %s friends to %s' % (len(friends_list),db_profiles)) #update how it counts
+    print('Indexed %s friends to %s' % (len(profile_files),db_profiles)) #update how it counts
 
 
 # ## Geocode locations
@@ -444,7 +454,7 @@ if __name__ == '__main__':
                     profiles_active += 1
             profiles_downloaded = len(glob.glob(profiles_dir+'*.html'))
             print(str(profiles_active)+" Active profiles indexed\n"+str(profiles_downloaded)+" Profiles downloaded")
-            #TODO: Handle case where more profiles downloaded tha active (from pervious runs)
+            #TODO: Have this check index to make sure all active profiles downloaded
             if profiles_downloaded >= profiles_active: 
                 print(">> Profile downloading completed, moving on")
             else:  
