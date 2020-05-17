@@ -2,20 +2,10 @@
 
 ![Map Example](https://raw.githubusercontent.com/jcontini/facebook-scraper/master/example.jpg)
 
+Create a map of your facebook friends! Useful for when you're passing through a city and can't remember all the people you want to grab coffee with.
+
 ## First: A Warning
-Use of this tool likely violates Facebook's terms & conditions. When using it, Facebook will knows who you are (because you have to log in), and can pretty easily see that you're using a tool like this in an unsanctioned way. Therefore by using this software, you put your own Facebook profile at risk, as Facebook may decide to ban you from the platform altogether. I cannot be held responsible for this or any other outcomes that may occur as a result of the use of this software.
-
-I personally built this to help centralize information about my contacts. Specifically, I wanted to make a map of all of my contacts (including Facebook friends), so that I could more easily see where they are living on the globe, and get in touch with them when I'm passing through.
-
-## How it works
-This tool will only extract the data that your friends have already explicitly made it available to you. If the amount or content of the data freaks you (like it did to me!), then it's a good reminder for us all to check our profiles/privacy settings to make sure that we only share what we want others to be able to see.
-
-It works like this:
-1. Open your friends list page (on m.facebook.com), save it (index.html) create a list of all of your friends as `index.json`
-2. Download each of your friends profiles (on mbasic.facebook.com) and parse/organize all data as `profiles.json`
-3. Look for the 'Current City' and 'Address' fields on each profile and save them to `friend_locations.json`.
-4. Geocode each unique location and add Latitude/Longitude to `points.geojson`. It uses the Mapbox Geocoding API to do this, so you need a Mapbox API key. Be sure to either use pipenv environments with a `.env` file, or open `make.py` to manually put in your Mapbox API key.
-5. Creates `friends-map.html`, using `template-map.html` as the base and your Mapbox API key to render the map. The result is a moveable, searchable map of your friends all over the world! All the data is included in the html file, so you can open it on your computer without a server.
+When using this tool, Facebook can see that you're using an automated tool, which violates their terms. There is a risk that Facebook may decide to put a temporary or permanent ban on your account (though I haven't heard of this happening to anyone yet). I am not responsible for this or any other outcomes that may occur as a result of the use of this software.
  
 ## Pre-requisites
 - Install the latest version of [Google Chrome Beta](https://www.google.com/chrome/beta/). This is because the script uses the latest version of the `chromedriver-binary`, which has to match the latest version of chrome.
@@ -37,3 +27,13 @@ It works like this:
 - `-- parse` Extract profiles HTML into profiles.json
 - `--geocode` Geocode addresses to coordinates
 - `--map` Make the map!
+
+## How it works
+This tool will only extract the data that your friends have already explicitly made it available to you. If the amount or content of the data freaks you (like it did to me!), then it's a good reminder for us all to check our profiles/privacy settings to make sure that we only share what we want others to be able to see.
+
+It works like this:
+1. Open your friends list page (on m.facebook.com), save it (index.html) create a list of all of your friends as `index.json`
+2. Download each of your friends profiles (on mbasic.facebook.com) and parse/organize all data as `profiles.json`
+3. Look for the 'Current City' and 'Address' fields on each profile and save them to `friend_locations.json`.
+4. Geocode each unique location and add Latitude/Longitude to `points.geojson`. It uses the Mapbox Geocoding API to do this, so you need a Mapbox API key. Be sure to either use pipenv environments with a `.env` file, or open `make.py` to manually put in your Mapbox API key.
+5. Creates `friends-map.html`, using `template-map.html` as the base and your Mapbox API key to render the map. The result is a moveable, searchable map of your friends all over the world! All the data is included in the html file, so you can open it on your computer without a server.
