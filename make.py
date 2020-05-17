@@ -5,8 +5,7 @@
 
 # In[2]:
 
-
-import argparse, json, os, glob, time, sys, requests, random, glob
+import argparse, json, os, glob, time, sys, requests, random, glob, webbrowser
 import chromedriver_binary
 from selenium.webdriver import Chrome, ChromeOptions
 from selenium.common import exceptions
@@ -57,6 +56,11 @@ def db_save(db,data):
     with open(db, 'w') as f:
         json.dump(data, f, indent=2)
 
+def db_read(db):
+    with open(db) as f:
+        data = json.load(f)
+        return data
+
 # ## Extract friends profiles from Facebook
 
 # In[ ]:
@@ -68,7 +72,7 @@ def start_browser():
     options.add_argument("--mute-audio")
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--headless')
+    #options.add_argument('--headless')
     options.add_experimental_option("prefs",{"profile.managed_default_content_settings.images":2})
 
     browser = Chrome(options=options)
@@ -288,7 +292,7 @@ def parse_profiles():
                 print('\nThanks for using the script! Please raise any issues at https://github.com/jcontini/facebook-scraper/issues.')
                 sys.exit()
             
-    print('Indexed %s friends to %s' % (len(profile_files),db_profiles)) #update how it counts
+    print('>> Parsed %s profiles to %s' % (len(profile_files),db_profiles)) #update how it counts
 
 
 # ## Geocode locations
@@ -297,6 +301,7 @@ def parse_profiles():
 
 
 def index_locations():
+    print("Indexing locations...")
     with open(db_profiles) as f:
         profiles = json.load(f)
     with open(db_index) as f:
@@ -402,6 +407,7 @@ def make_map():
     with open('friends-map.html', "w") as f:
         f.write(html)
     print('Saved map to friends-map.html!')
+    webbrowser.open_new('file://' + os.getcwd() + '/friends-map.html') 
 
 
 # ## Shell application
@@ -416,38 +422,22 @@ if __name__ == '__main__':
     parser.add_argument('--parse', action='store_true', help='Parse profiles to JSON')
     parser.add_argument('--geocode', action='store_true', help='Geocode addresses to coordinates')
     parser.add_argument('--map', action='store_true', help='Make the map!')
-
     args = parser.parse_args()
     signed_in = False
     browser = False
     try:
-        if args.index:
-            browser = start_browser()
-            sign_in()
-            download_friends()
-            index_friends()
-        elif args.download:
-            browser = start_browser()
-            sign_in()
-            download_profiles()
-        elif args.parse:
-            browser = start_browser()
-            parse_profiles()
-        elif args.geocode:
-            index_locations()
-            geocode_locations()
-        elif args.map:
-            make_map()
-        else:
-            #Index friends list
-            if not os.path.exists(db_index):
+        if not len(sys.argv) > 1:
+        #Index friends list
+            count_indexed = len(db_read(db_index))
+            if(count_indexed) == 0:
                 browser = start_browser()
                 signed_in = sign_in()
                 download_friends()
                 index_friends()
             else:
                 print(">> Indexing completed, moving on. To re-index, delete " + db_index)
-            #Download profiles
+
+        #Download profiles
             with open(db_index, 'r') as f:
                 index = json.load(f)
             profiles_active = 0
@@ -455,7 +445,11 @@ if __name__ == '__main__':
                 if not d['is_deactivated']:
                     profiles_active += 1
             profiles_downloaded = len(glob.glob(profiles_dir+'*.html'))
-            print(str(profiles_active)+" Active profiles indexed\n"+str(profiles_downloaded)+" Profiles downloaded")
+            if profiles_active == 0:
+                print(">> The index file seems to be blank. Please delete " + db_index + " and run the script again")
+                sys.exit(1)
+            else:
+                print(str(profiles_active)+" Active profiles indexed\n"+str(profiles_downloaded)+" Profiles downloaded")
             #TODO: Have this check index to make sure all active profiles downloaded
             if profiles_downloaded >= profiles_active: 
                 print(">> Profile downloading completed, moving on")
@@ -477,6 +471,23 @@ if __name__ == '__main__':
             #Geocode
             index_locations()
             geocode_locations()
+            make_map()
+        elif args.index:
+            browser = start_browser()
+            sign_in()
+            download_friends()
+            index_friends()
+        elif args.download:
+            browser = start_browser()
+            sign_in()
+            download_profiles()
+        elif args.parse:
+            browser = start_browser()
+            parse_profiles()
+        elif args.geocode:
+            index_locations()
+            geocode_locations()
+        elif args.map:
             make_map()
 
     except KeyboardInterrupt:
