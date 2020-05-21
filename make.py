@@ -5,12 +5,14 @@
 
 # In[2]:
 
-import argparse, json, os, glob, time, sys, requests, random, glob, webbrowser
-import chromedriver_binary
+import argparse, json, os, glob, time, sys, requests, random, glob, webbrowser, chromedriver_binary
 from selenium.webdriver import Chrome, ChromeOptions
 from selenium.common import exceptions
 from datetime import datetime
 from geojson import Feature, FeatureCollection, Point
+from sys import stdout
+
+os.system('cls' if os.name == 'nt' else 'clear')
 
 #Set up environment
 if os.path.exists('.env'):
@@ -72,7 +74,7 @@ def start_browser():
     options.add_argument("--mute-audio")
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-    #options.add_argument('--headless')
+    options.add_argument('--headless')
     options.add_experimental_option("prefs",{"profile.managed_default_content_settings.images":2})
 
     browser = Chrome(options=options)
@@ -97,10 +99,10 @@ def sign_in():
 
 # In[ ]:
 
-def download_friends():
+def download_friends_list():
     browser.get("https://m.facebook.com/me/friends")
     time.sleep(3)
-    print('Scrolling to bottom. Please wait, this takes ~1 min per 300 friends)...')
+    print('Scrolling to bottom. Please wait, this takes a few mins...')
     #Scroll to bottom
     while browser.find_elements_by_css_selector('#m_more_friends'):
         browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
@@ -108,7 +110,7 @@ def download_friends():
     #Save friend list
     with open (friends_html, 'w') as f:
         f.write(browser.page_source)
-        print('%s) Downloaded' % friends_html)
+        print(">> Saved friend list to '%s'" % friends_html)
 
 
 # In[ ]:
@@ -119,20 +121,19 @@ def index_friends():
     already_parsed = []
     for i,d in enumerate(friends):
         already_parsed.append(d['id'])
-    print('Indexing friends list...')
+    print('Opening saved friends list...')
     browser.get('file:///' + os.getcwd() + '/' + friends_html)
     base = '(//*[@data-sigil="undoable-action"])'
     num_items = len(browser.find_elements_by_xpath(base))
     if num_items == 0:
-        print("\nWasn't able to parse friends index. This probably means that Facebook updated their template. \nPlease raise at https://github.com/jcontini/facebook-scraper/issues and I will try to update the script. \nOr if you can code, please submit a pull request instead :)\n")
+        print("\nWasn't able to parse friends index. This probably means that Facebook updated their template. \nPlease raise issue on Github and I will try to update the script. \nOr if you can code, please submit a pull request instead :)\n")
         sys.exit()
-    print('Scanning %s friends...' % (num_items))
     for i in range(1,num_items+1):
         b = base + '['+str(i)+']/'
         info = json.loads(browser.find_element_by_xpath(b+'/div[3]/div/div/div[3]').get_attribute('data-store'))
-        if info['id'] in already_parsed:
-            print('%s) // Already indexed %s, skipping...' % (i,info['id']))
-        else:
+        stdout.write("\rScanning friends... (%d / %d)" % (i,num_items))
+        stdout.flush()
+        if not info['id'] in already_parsed:
             alias = '' if info['is_deactivated'] else browser.find_element_by_xpath(b+'/div[2]//a').get_attribute('href')[8:]
             d = {
                 'id': info['id'],
@@ -141,12 +142,12 @@ def index_friends():
                 'alias': alias,
                 'photo_url': browser.find_element_by_xpath(b+'div[1]/a/i').get_attribute('style').split('("')[1].split('")')[0],
                 }
-            print('%s) %s' % (i,d['name']))
+            print('\n>> Added %s (#%s)' % (d['name'],i))
             friends.append(d)
 
             with open(db_index, 'w') as f:
                 json.dump(friends, f, indent=4)
-    print('Indexed %s friends to %s' % (num_items,db_index))
+    print('\nIndexed %s friends to %s' % (num_items,db_index))
 
 
 # In[ ]:
@@ -423,19 +424,17 @@ if __name__ == '__main__':
     parser.add_argument('--geocode', action='store_true', help='Geocode addresses to coordinates')
     parser.add_argument('--map', action='store_true', help='Make the map!')
     args = parser.parse_args()
+    browser = start_browser()
     signed_in = False
-    browser = False
     try:
         if not len(sys.argv) > 1:
         #Index friends list
+            signed_in = sign_in()
             count_indexed = len(db_read(db_index))
-            if(count_indexed) == 0:
-                browser = start_browser()
-                signed_in = sign_in()
-                download_friends()
-                index_friends()
-            else:
-                print(">> Indexing completed, moving on. To re-index, delete " + db_index)
+            print(">> %s friends indexed" %(count_indexed))
+            if not signed_in: sign_in()
+            download_friends_list()
+            index_friends()
 
         #Download profiles
             with open(db_index, 'r') as f:
@@ -449,14 +448,13 @@ if __name__ == '__main__':
                 print(">> The index file seems to be blank. Please delete " + db_index + " and run the script again")
                 sys.exit(1)
             else:
-                print(str(profiles_active)+" Active profiles indexed\n"+str(profiles_downloaded)+" Profiles downloaded")
+                print(">> "+str(profiles_active)+" Active profiles indexed")
+                print(">> "+str(profiles_downloaded)+" Profiles downloaded")
             #TODO: Have this check index to make sure all active profiles downloaded
             if profiles_downloaded >= profiles_active: 
                 print(">> Profile downloading completed, moving on")
             else:  
-                if signed_in == False:
-                    browser = start_browser()
-                    signed_in = sign_in()
+                if not signed_in: sign_in()
                 download_profiles()
             #Parse profiles
             with open(db_profiles) as f:
@@ -465,24 +463,17 @@ if __name__ == '__main__':
             if profiles_parsed == profiles_downloaded:
                 print(">> Profile parsing completed, moving on")
             else:
-                if browser == False:
-                    browser = start_browser()
                 parse_profiles()
             #Geocode
             index_locations()
             geocode_locations()
             make_map()
         elif args.index:
-            browser = start_browser()
-            sign_in()
-            download_friends()
             index_friends()
         elif args.download:
-            browser = start_browser()
-            sign_in()
+            if not signed_in: sign_in()
             download_profiles()
         elif args.parse:
-            browser = start_browser()
             parse_profiles()
         elif args.geocode:
             index_locations()
