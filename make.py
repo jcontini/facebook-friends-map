@@ -116,8 +116,7 @@ def download_friends_list():
 # In[ ]:
 
 def index_friends():
-    with open(db_index) as f:
-        friends = json.load(f)
+    friends = db_read(db_index)
     already_parsed = []
     for i,d in enumerate(friends):
         already_parsed.append(d['id'])
@@ -145,34 +144,28 @@ def index_friends():
             print('\n>> Added %s (#%s)' % (d['name'],i))
             friends.append(d)
 
-            with open(db_index, 'w') as f:
-                json.dump(friends, f, indent=4)
+            db_save(db_index,friends)
     print('\nIndexed %s friends to %s' % (num_items,db_index))
 
 
 # In[ ]:
 
 def download_profiles():
-    print('Downloading profiles from index...')
+    print('Downloading profiles...')
     session_downloads = 0
-    with open(db_index, 'r') as f:
-        data = json.load(f)
-    for i,d in enumerate(data):
-        print('%s) %s' % (i+1,d['name']),end="",flush=True)
-        if d['is_deactivated']:
-            print(' // Skipped (Profile deactivated)')
-        else:
+    index = db_read(db_index)
+    for i,d in enumerate(index):
+        if not d['is_deactivated']:
             fname = profiles_dir + str(d['id']) + '.html'
-            if os.path.exists(fname):
-                print(" // Skipped (Already Exists): %s" % (fname))
-            else:
+            if not os.path.exists(fname):
+                print('- %s (# %s)' % (d['name'],d['id']),end="",flush=True)
                 browser.get('https://mbasic.facebook.com/profile.php?v=info&id='+str(d['id']))
                 session_downloads += 1
                 time.sleep(random.randint(1,3)) #Attempt to be a bit more stealthy
                 if session_downloads == 45:
-                    print("Taking a voluntary break at " + str(session_downloads) + " profile downloads, to prevent triggering Facebook's alert systems. I recommend you quit (Ctrl-C or quit this window) to play it safe and try coming back tomorrow to space it out. \nOr, press enter to continue at your own risk.")
+                    print("Taking a voluntary break at " + str(session_downloads) + " profile downloads to prevent triggering Facebook's alert systems. I recommend you quit (Ctrl-C or quit this window) to play it safe and try coming back tomorrow to space it out. \nOr, press enter to continue at your own risk.")
                 if browser.title == "You can't use this feature at the moment":
-                    print("\n***WARNING***\n\nFacebook detected abnormal activity, so this script is going play it safe and take a break.\n- As of March 2020, this seems to happen after downloading ~45 profiles in 1 session.\n- I recommend not running the script again until tomorrow.\n- Excessive use might cause Facebook to get more suspicious and possibly suspend your account.\n\nIf you have experience writing scrapers, please feel free to recommend ways to avoid triggering Facebook's detection system :) ")
+                    print("\n***WARNING***\n\nFacebook detected abnormal activity, so this script is going play it safe and take a break.\n- As of March 2020, this seems to happen after downloading ~45 profiles in 1 session.\n- I recommend not running the script again until tomorrow.\n- Excessive use might cause Facebook to get more suspicious and possibly suspend your account.\n\nIf you have experience writing scrapers, please feel free to recommend ways to avoid triggering Facebook's detection system :)")
                     sys.exit(1)
                 if browser.find_elements_by_css_selector('#login_form') or browser.find_elements_by_css_selector('#mobile_login_bar'):
                     print('\nBrowser is not logged into facebook! Please run again to login & resume.')
@@ -180,16 +173,13 @@ def download_profiles():
                 else:
                     with open (fname, 'w') as f:
                         f.write(browser.page_source)
-                        print(' // Downloaded to %s' % fname)
-
 
 # In[ ]:
 
 def parse_profiles():
     profiles = []
     already_parsed = []
-    with open(db_profiles) as f:
-        profiles = json.load(f)
+    profiles = db_read(db_profiles)
     for i,profile in enumerate(profiles):
         already_parsed.append(profile['id'])
     profile_files = glob.glob(profiles_dir+'*.html')
@@ -212,7 +202,7 @@ def parse_profiles():
     for i,r in enumerate(profile_files):
         profile_id = int(r.split('/')[-1].split('.')[0])
         if not profile_id in already_parsed:
-            print('%s/%s) Profile #%s' % (i+1,len(profile_files),profile_id),end="",flush=True)
+            print('%s/%s) #%s' % (i+1,len(profile_files),profile_id),end="",flush=True)
             profile_path = 'file://'+os.getcwd()+'/'+r
             browser.get(profile_path)
             x = browser.find_element_by_xpath
@@ -309,7 +299,6 @@ def index_locations():
         index = json.load(f)
     locations = []
     for idx,r in enumerate(profiles):
-        print('%s) %s (%s): ' % (idx+1,r['name'],r['id']),end="",flush=True)
         loc = ''
         for i,d in enumerate(r['details']):
             if d.get('Address'):
@@ -320,7 +309,6 @@ def index_locations():
         for i,d in enumerate(index):
             if r['id'] == d['id']:
                 photo = d['photo_url']
-            
         if loc:
             d = {
                 'id': r['id'],
@@ -361,7 +349,6 @@ def geocode_locations():
         coordinates = r.json()['features'][0]['geometry']['coordinates']
         print('%s : %s' % (location ,coordinates))
         geos.append({location:coordinates})
-        print('-'*20)
     
     with open(db_geo,'w') as f:
         json.dump(geos, f, indent=4)
@@ -411,11 +398,7 @@ def make_map():
     webbrowser.open_new('file://' + os.getcwd() + '/friends-map.html') 
 
 
-# ## Shell application
-
-# In[17]:
-
-
+# Shell application
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Facebook friends profile exporter')
     parser.add_argument('--index', action='store_true', help='Index friends list')
@@ -431,43 +414,55 @@ if __name__ == '__main__':
         #Index friends list
             signed_in = sign_in()
             count_indexed = len(db_read(db_index))
-            print(">> %s friends indexed" %(count_indexed))
+            print(">> Loaded %s friends from index" %(count_indexed))
             if not signed_in: sign_in()
             download_friends_list()
             index_friends()
 
         #Download profiles
-            with open(db_index, 'r') as f:
-                index = json.load(f)
-            profiles_active = 0
-            for d in (index):
-                if not d['is_deactivated']:
-                    profiles_active += 1
-            profiles_downloaded = len(glob.glob(profiles_dir+'*.html'))
-            if profiles_active == 0:
-                print(">> The index file seems to be blank. Please delete " + db_index + " and run the script again")
+            # Get list of downloaded ids
+            profile_files = glob.glob1(profiles_dir,'*.html')
+            downloaded_ids = []
+            for f in profile_files:
+                downloaded_ids.append(int(f.replace('.html','')))
+                
+            # Get list of active indexed IDs
+            indexed_profiles = db_read(db_index)
+            if len(indexed_profiles) == 0:
+                print(">> No profiles indexed. Please delete "+db_index+" and run again")
                 sys.exit(1)
-            else:
-                print(">> "+str(profiles_active)+" Active profiles indexed")
-                print(">> "+str(profiles_downloaded)+" Profiles downloaded")
-            #TODO: Have this check index to make sure all active profiles downloaded
-            if profiles_downloaded >= profiles_active: 
-                print(">> Profile downloading completed, moving on")
-            else:  
+            indexed_ids = []
+            for i in indexed_profiles:
+                if i['is_deactivated'] == False:
+                    indexed_ids.append(i['id'])
+
+            # Do some counting
+            count_inactive = len(indexed_profiles)-len(indexed_ids)
+            inactive_downloaded = list(set(downloaded_ids) - set(indexed_ids))
+            ids_to_download = list(set(indexed_ids) - set(downloaded_ids))
+
+            print(">> %s Profiles active (%s deactivated)" % (len(indexed_ids),count_inactive))
+            print(">> %s Profiles downloaded (including %s deactivated)" % (len(downloaded_ids),len(inactive_downloaded)))
+
+            # If new profiles to download, get to it
+            if len(ids_to_download) != 0:
+                print(">> %s new profiles to download! Getting to it..." % (len(ids_to_download)))
                 if not signed_in: sign_in()
                 download_profiles()
-            #Parse profiles
-            with open(db_profiles) as f:
-                profiles = json.load(f)
-            profiles_parsed = len(profiles)
-            if profiles_parsed == profiles_downloaded:
+
+        #Parse profiles
+            profiles_db = db_read(db_profiles)
+            if len(profiles_db) == len(profile_files):
                 print(">> Profile parsing completed, moving on")
             else:
                 parse_profiles()
-            #Geocode
+
+        #Geocode
             index_locations()
             geocode_locations()
             make_map()
+
+        #Run only specific tasks if specified in arguments    
         elif args.index:
             index_friends()
         elif args.download:
