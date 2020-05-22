@@ -1,17 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # Facebook profile export & map
-
-# In[2]:
-
 import argparse, json, os, glob, time, sys, requests, random, glob, webbrowser, chromedriver_binary
 from selenium.webdriver import Chrome, ChromeOptions
 from selenium.common import exceptions
 from datetime import datetime
 from geojson import Feature, FeatureCollection, Point
 from sys import stdout
-
 os.system('cls' if os.name == 'nt' else 'clear')
 
 #Set up environment
@@ -63,10 +58,7 @@ def db_read(db):
         data = json.load(f)
         return data
 
-# ## Extract friends profiles from Facebook
-
-# In[ ]:
-
+# Configure browser
 def start_browser():
     options = ChromeOptions() 
     options.add_argument("--disable-notifications")
@@ -80,8 +72,7 @@ def start_browser():
     browser = Chrome(options=options)
     return browser
 
-# In[ ]:
-
+# Login
 def sign_in():
     fb_start_page = 'https://m.facebook.com/'
     print("Logging in %s automatically..." % fb_user)
@@ -96,25 +87,19 @@ def sign_in():
     time.sleep(3)
     return True
 
-
-# In[ ]:
-
+# Download friends list
 def download_friends_list():
     browser.get("https://m.facebook.com/me/friends")
     time.sleep(3)
     print('Scrolling to bottom. Please wait, this takes a few mins...')
-    #Scroll to bottom
     while browser.find_elements_by_css_selector('#m_more_friends'):
         browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         time.sleep(1)
-    #Save friend list
-    with open (friends_html, 'w') as f:
+    with open (friends_html, 'w', encoding="utf-8") as f:
         f.write(browser.page_source)
         print(">> Saved friend list to '%s'" % friends_html)
 
-
-# In[ ]:
-
+# Parse friends list into JSON
 def index_friends():
     friends = db_read(db_index)
     already_parsed = []
@@ -147,9 +132,7 @@ def index_friends():
             db_save(db_index,friends)
     print('\nIndexed %s friends to %s' % (num_items,db_index))
 
-
-# In[ ]:
-
+# Download profile pages
 def download_profiles():
     print('Downloading profiles...')
     session_downloads = 0
@@ -161,7 +144,7 @@ def download_profiles():
                 print('- %s (# %s)' % (d['name'],d['id']),end="",flush=True)
                 browser.get('https://mbasic.facebook.com/profile.php?v=info&id='+str(d['id']))
                 session_downloads += 1
-                time.sleep(random.randint(1,3)) #Attempt to be a bit more stealthy
+                time.sleep(random.randint(1,3))
                 if session_downloads == 45:
                     print("Taking a voluntary break at " + str(session_downloads) + " profile downloads to prevent triggering Facebook's alert systems. I recommend you quit (Ctrl-C or quit this window) to play it safe and try coming back tomorrow to space it out. \nOr, press enter to continue at your own risk.")
                 if browser.title == "You can't use this feature at the moment":
@@ -171,11 +154,10 @@ def download_profiles():
                     print('\nBrowser is not logged into facebook! Please run again to login & resume.')
                     sys.exit(1)
                 else:
-                    with open (fname, 'w') as f:
+                    with open (fname, 'w', encoding="utf-8") as f:
                         f.write(browser.page_source)
 
-# In[ ]:
-
+# Parse profile pages into JSON
 def parse_profiles():
     profiles = []
     already_parsed = []
@@ -283,13 +265,10 @@ def parse_profiles():
                 print('\nThanks for using the script! Please raise any issues at https://github.com/jcontini/facebook-scraper/issues.')
                 sys.exit()
             
-    print('>> Parsed %s profiles to %s' % (len(profile_files),db_profiles)) #update how it counts
+    print('>> %s profiles parsed to %s' % (len(profile_files),db_profiles))
 
 
-# ## Geocode locations
-
-# In[ ]:
-
+# Geocode locations
 
 def index_locations():
     print("Indexing locations...")
@@ -321,7 +300,7 @@ def index_locations():
         else:
             print('(no location)')
     
-    with open(db_friend_locations,'w') as f:
+    with open(db_friend_locations,'w', encoding="utf-8") as f:
         json.dump(locations, f, indent=4)
     print('Indexed %s friends locations to %s' % (len(locations),db_friend_locations))
 
@@ -392,7 +371,7 @@ def make_map():
         html=f.read()
         html=html.replace('{{mapbox_token}}', mapbox_token)
         html=html.replace('{{datapoints}}', str(collection))
-    with open('friends-map.html', "w") as f:
+    with open('friends-map.html', "w", encoding="utf-8") as f:
         f.write(html)
     print('Saved map to friends-map.html!')
     webbrowser.open_new('file://' + os.getcwd() + '/friends-map.html') 
