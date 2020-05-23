@@ -51,11 +51,11 @@ if not os.path.exists(db_profiles):
 
 def db_save(db,data):
     try:
-        with open(db, 'w') as f:
+        with open(db, 'w', encoding="utf-8") as f:
             json.dump(data, f, indent=2)
     except KeyboardInterrupt:
             print('\nSaving last record...')
-            with open(db, 'w') as f:
+            with open(db, 'w', encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
             print('\nThanks for using the script! Please raise any issues on Github')
             sys.exit()
@@ -73,7 +73,7 @@ def start_browser():
     options.add_argument("--mute-audio")
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-    #options.add_argument('--headless')
+    options.add_argument('--headless')
     options.add_experimental_option("prefs",{"profile.managed_default_content_settings.images":2})
 
     browser = Chrome(options=options)
@@ -98,12 +98,11 @@ def sign_in():
 def download_friends_list():
     browser.get("https://m.facebook.com/me/friends")
     time.sleep(3)
-    print('Scrolling to bottom. Please wait, this takes a few mins...')
+    print('Loading friends list...')
     scrollpage = 1
-    friendspp = 36
     while browser.find_elements_by_css_selector('#m_more_friends'):
         browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        stdout.write("\ Scrolled to page %d (~%d friends)" % (scrollpage,scrollpage*friendspp))
+        stdout.write("\r>> Scrolled to page %d" % (scrollpage))
         stdout.flush()
         scrollpage += 1
         time.sleep(1)
@@ -128,7 +127,7 @@ def index_friends():
     for i in range(1,num_items+1):
         b = base + '['+str(i)+']/'
         info = json.loads(browser.find_element_by_xpath(b+'/div[3]/div/div/div[3]').get_attribute('data-store'))
-        stdout.write("\rScanning friends... (%d / %d)" % (i,num_items))
+        stdout.write("\rScanning friend list... (%d / %d)" % (i,num_items))
         stdout.flush()
         if not info['id'] in already_parsed:
             alias = '' if info['is_deactivated'] else browser.find_element_by_xpath(b+'/div[2]//a').get_attribute('href')[8:]
@@ -143,7 +142,7 @@ def index_friends():
             friends.append(d)
 
             db_save(db_index,friends)
-    print('\nIndexed %s friends to %s' % (num_items,db_index))
+    print('\n>> Saved friends list (%s) to %s' % (num_items,db_index))
 
 # Download profile pages
 def download_profiles():
@@ -154,7 +153,7 @@ def download_profiles():
         if not d['is_deactivated']:
             fname = profiles_dir + str(d['id']) + '.html'
             if not os.path.exists(fname):
-                print('- %s (# %s)' % (d['name'],d['id']),end="",flush=True)
+                print('- %s (# %s)' % (d['name'],d['id']))
                 browser.get('https://mbasic.facebook.com/profile.php?v=info&id='+str(d['id']))
                 session_downloads += 1
                 time.sleep(random.randint(1,3))
@@ -282,51 +281,48 @@ def parse_profile_files():
 # Create index of friends and their locations
 
 def index_locations():
-    print("Indexing locations...")
-    with open(db_profiles) as f:
-        profiles = json.load(f)
-    with open(db_index) as f:
-        index = json.load(f)
+    print("Scanning profiles for location (eg. current city)...")
+    profiles = db_read(db_profiles)
+    index = db_read(db_index)
     locations = []
-    for idx,r in enumerate(profiles):
+
+    for p in profiles:
         loc = ''
-        for i,d in enumerate(r['details']):
+        for d in p['details']:
             if d.get('Address'):
                 loc = d.get('Address')
-        for i,d in enumerate(r['details']):
+        for d in p['details']:
             if d.get('Current City'):
                 loc = d.get('Current City')  
-        for i,d in enumerate(index):
-            if r['id'] == d['id']:
+        
+        for d in index:
+            if p['id'] == d['id']:
                 photo = d['photo_url']
+                
         if loc:
             d = {
-                'id': r['id'],
-                'name': r['name'],
+                'id': p['id'],
+                'name': p['name'],
                 'location': loc,
                 'photo': photo
             }
-            print(d['location'])
             locations.append(d)
-        else:
-            print('(no location)')
     
-    with open(db_friend_locations,'w', encoding="utf-8") as f:
-        json.dump(locations, f, indent=4)
-    print('Indexed %s friends locations to %s' % (len(locations),db_friend_locations))
+    db_save(db_friend_locations,locations)
+    print('>> Saved %s friend locations to %s' % (len(locations),db_friend_locations))
 
 # Get coordinates for all locations and save to GeoJSON
 def geocode_locations():
-    with open(db_friend_locations) as f:
-        data = json.load(f)
+    data = db_read(db_friend_locations)
     locations = []
-    for i,r in enumerate(data):
+    for r in data:
         locations.append(r['location'])
-    unique_locs = list(set(locations))
+    unique_locations = list(set(locations))
+
     url_base = 'https://api.mapbox.com/geocoding/v5/mapbox.places/'
     print('Geocoding locations from profiles...')
     geos = []
-    for location in unique_locs:
+    for location in unique_locations:
         r = requests.get(url_base + location + '.json',
          params={
              'access_token': mapbox_token,
@@ -334,30 +330,27 @@ def geocode_locations():
              'limit': 1
          })
         coordinates = r.json()['features'][0]['geometry']['coordinates']
-        print('%s : %s' % (location ,coordinates))
+
+        stdout.write('\r%s %s                    ' % (location ,coordinates))
+        stdout.flush()
+        
         geos.append({location:coordinates})
     
-    with open(db_geo,'w') as f:
-        json.dump(geos, f, indent=4)
-    print('Indexed %s coordinates to %s' % (len(geos),db_geo))
+    db_save(db_geo,geos)
+    print('>> Saved coordinates for %s locations to %s' % (len(geos),db_geo))
 
 # Make map from HTML Mapbox template & GeoJSON
 def make_map():
-    #Open friends-locations list
-    with open(db_friend_locations) as f:
-        friends = json.load(f)
-    #Open location-coordinates list
-    with open(db_geo) as f:
-        locations = json.load(f)
+    friend_locations = db_read(db_friend_locations)
+    location_coordinates = db_read(db_geo)
     geo_dict = {}
-    for loc in locations:
+    for loc in location_coordinates:
         for k_loc,v_coordinates in loc.items():
             geo_dict[k_loc] = v_coordinates
 
     features = []
-    for i,friend in enumerate(friends):
-        friend['coordinates'] = geo_dict[friend['location']] #Set friend coordinates based on location list
-        print('%s) %s // %s' %(i,friend['name'],friend['coordinates']))
+    for i,friend in enumerate(friend_locations):
+        friend['coordinates'] = geo_dict[friend['location']]
         features.append(Feature(
                 geometry = Point(friend['coordinates']),
                 properties = {
@@ -370,7 +363,7 @@ def make_map():
         with open(db_geojson, "w") as f:
             f.write('%s' % collection)
 
-    print('Added coordinates for %s friends!' % len(friends))
+    print('>> Added coordinates for %s friends!' % len(friend_locations))
 
     with open('template-map.html') as f:
         html=f.read()
@@ -378,9 +371,8 @@ def make_map():
         html=html.replace('{{datapoints}}', str(collection))
     with open('friends-map.html', "w", encoding="utf-8") as f:
         f.write(html)
-    print('Saved map to friends-map.html!')
+    print('>> Saved map to friends-map.html!')
     webbrowser.open_new('file://' + os.getcwd() + '/friends-map.html') 
-
 
 # Shell application
 if __name__ == '__main__':
@@ -398,7 +390,6 @@ if __name__ == '__main__':
         #Index friends list
             signed_in = sign_in()
             count_indexed = len(db_read(db_index))
-            print(">> Loaded %s friends from index" %(count_indexed))
             if not signed_in: sign_in()
             download_friends_list()
             index_friends()
@@ -463,4 +454,3 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print('\nThanks for using the script! Please raise any issues at https://github.com/jcontini/facebook-scraper/issues.')
         pass
-
