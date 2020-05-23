@@ -182,7 +182,7 @@ def parse_profiles():
 
     print('Parsing profile pages...')
     for i,r in enumerate(profile_files):
-        profile_id = int(r.split('/')[-1].split('.')[0])
+        profile_id = int(os.path.basename(r).split('.')[0])
         if not profile_id in already_parsed:
             print('%s/%s) #%s' % (i+1,len(profile_files),profile_id),end="",flush=True)
             profile_path = 'file://'+os.getcwd()+'/'+r
