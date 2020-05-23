@@ -50,8 +50,15 @@ if not os.path.exists(db_profiles):
         f.write("[]")
 
 def db_save(db,data):
-    with open(db, 'w') as f:
-        json.dump(data, f, indent=2)
+    try:
+        with open(db, 'w') as f:
+            json.dump(data, f, indent=2)
+    except KeyboardInterrupt:
+            print('\nSaving last record...')
+            with open(db, 'w') as f:
+                json.dump(data, f, indent=2)
+            print('\nThanks for using the script! Please raise any issues on Github')
+            sys.exit()
 
 def db_read(db):
     with open(db) as f:
@@ -66,7 +73,7 @@ def start_browser():
     options.add_argument("--mute-audio")
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--headless')
+    #options.add_argument('--headless')
     options.add_experimental_option("prefs",{"profile.managed_default_content_settings.images":2})
 
     browser = Chrome(options=options)
@@ -92,12 +99,18 @@ def download_friends_list():
     browser.get("https://m.facebook.com/me/friends")
     time.sleep(3)
     print('Scrolling to bottom. Please wait, this takes a few mins...')
+    scrollpage = 1
+    friendspp = 36
     while browser.find_elements_by_css_selector('#m_more_friends'):
         browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        stdout.write("\ Scrolled to page %d (~%d friends)" % (scrollpage,scrollpage*friendspp))
+        stdout.flush()
+        scrollpage += 1
         time.sleep(1)
+
     with open (friends_html, 'w', encoding="utf-8") as f:
         f.write(browser.page_source)
-        print(">> Saved friend list to '%s'" % friends_html)
+        print("\n>> Saved friend list to '%s'" % friends_html)
 
 # Parse friends list into JSON
 def index_friends():
@@ -158,117 +171,115 @@ def download_profiles():
                         f.write(browser.page_source)
 
 # Parse profile pages into JSON
-def parse_profiles():
-    profiles = []
-    already_parsed = []
-    profiles = db_read(db_profiles)
-    for i,profile in enumerate(profiles):
-        already_parsed.append(profile['id'])
-    profile_files = glob.glob(profiles_dir+'*.html')
-
+def parse_profile(profile_file):
     sections = {
-        'photo_url': {'src':'//div[@id="objects_container"]//a/img[@alt][1]'},
         'tagline': {'txt':'//*[@id="root"]/div[1]/div[1]/div[2]/div[2]'},
-        'about': {'txt':'//div[@id="bio"]/div/div[2]/div'},
-        'quotes': {'txt':'//*[@id="quote"]/div/div[2]/div'},
-        'rel': {'txt':'//div[@id="relationship"]/div/div[2]'},
-        'rel_partner': {'href':'//div[@id="relationship"]/div/div[2]//a'},
-        'details': {'table':'(//div[2]/div//div[@title]//'},
-        'work': {'workedu':'//*[@id="work"]/div[1]/div[2]/div'},
-        'education': {'workedu':'//*[@id="education"]/div[1]/div[2]/div'},
-        'family': {'fam':'//*[@id="family"]/div/div[2]/div'},
-        'life_events': {'years':'(//div[@id="year-overviews"]/div[1]/div[2]/div[1]/div/div[1])'}
+        'about': {'txt':'//div[@id="bio"]/div/div/div'},
+        'quotes': {'txt':'//*[@id="quote"]/div/div/div'},
+        'rel': {'txt':'//div[@id="relationship"]/div/div/div'},
+        'rel_partner': {'href':'//div[@id="relationship"]/div/div/div//a'},
+        'details': {'table':'(//div[not(@id)]/div/div/table[@cellspacing]/tbody/tr//'},
+        'work': {'workedu':'//*[@id="work"]/div[1]/div/div'},
+        'education': {'workedu':'//*[@id="education"]/div[1]/div/div'},
+        'family': {'fam':'//*[@id="family"]/div/div/div'},
+        'life_events': {'years':'(//div[@id="year-overviews"]/div/div/div/div/div)'}
     }
 
-    print('Parsing profile pages...')
-    for i,r in enumerate(profile_files):
-        profile_id = int(os.path.basename(r).split('.')[0])
-        if not profile_id in already_parsed:
-            print('%s/%s) #%s' % (i+1,len(profile_files),profile_id),end="",flush=True)
-            profile_path = 'file://'+os.getcwd()+'/'+r
-            browser.get(profile_path)
-            x = browser.find_element_by_xpath
-            xs = browser.find_elements_by_xpath
-            d = {
-                'id': profile_id,
-                'name': browser.title,
-                'alias': x('//a/text()[. = "Timeline"][1]/..').get_attribute('href')[8:].split('?')[0],
-                'meta' : {
-                    'created': time.strftime('%Y-%m-%d', time.localtime(os.path.getctime(r))),
-                }
-            }
-            for k,v in sections.items():
-                try:
-                    if 'src' in v:
-                        d[str(k)] = x(v['src']).get_attribute('src')
-                    elif 'txt' in v:
-                        d[str(k)] = x(v['txt']).text
-                    elif 'href' in v:
-                        d[str(k)] = x(v['href']).get_attribute('href')[8:].split('?')[0]
-                    elif 'table' in v:
-                        d['details'] = []
-                        rows = xs(v['table']+'td[1])')
-                        for i in range (1, len(rows)+1):
-                            deets_key = x(v['table']+'td[1])'+'['+str(i)+']').text
-                            deets_val = x(v['table']+'td[2])'+'['+str(i)+']').text
-                            d['details'].append({deets_key:deets_val})
-                    elif 'workedu' in v:
-                        d[str(k)] = []
-                        base = v['workedu']
-                        rows = xs(base)
-                        for i in range (1, len(rows)+1):
-                            dd = {}
-                            dd['link'] = x(base+'['+str(i)+']'+'/div/div[1]//a').get_attribute('href')[8:].split('&')[0].split('/')[0]
-                            dd['org'] = x(base+'['+str(i)+']'+'/div/div[1]//a').text
-                            dd['lines'] = []
-                            lines = xs(base+'['+str(i)+']'+'/div/div[1]/div')
-                            for l in range (2, len(lines)+1):
-                                line = x(base+'['+str(i)+']'+'/div/div[1]/div'+'['+str(l)+']').text
-                                dd['lines'].append(line)
-                            d[str(k)].append(dd)
-                    elif 'fam' in v:
-                        d[str(k)] = []
-                        base = v['fam']
-                        rows = xs(base)
-                        for i in range (1, len(rows)+1):
-                            d[str(k)].append({
-                                'name': x(base+'['+str(i)+']'+'//h3[1]').text,
-                                'rel': x(base+'['+str(i)+']'+'//h3[2]').text,
-                                'alias': x(base+'['+str(i)+']'+'//h3[1]/a').get_attribute('href')[8:].split('?')[0]
-                            })
-                    elif 'life_events' in k:
-                        d[str(k)] = []
-                        base = v['years']
-                        years = xs(base)
-                        for i in range (1,len(years)+1):
-                            year = x(base+'['+str(i)+']'+'/div[1]').text
-                            events = xs(base+'['+str(i)+']'+'/div/div/a')
-                            for e in range(1,len(events)+1):
-                                event = x('('+base+'['+str(i)+']'+'/div/div/a)'+'['+str(e)+']')
-                                d[str(k)].append({
-                                    'year': year,
-                                    'title': event.text,
-                                    'link': event.get_attribute('href')[8:].split('refid')[0]
-                                })
-                    
-                except exceptions.NoSuchElementException:
-                    pass
-            
-            print(' // %s (%s)' % (d['name'],d['alias']))
-            profiles.append(d)
+    profile_id = int(os.path.basename(profile_file).split('.')[0])
+    profile_path = 'file://' + os.getcwd() + '/' + profile_file
+    
+    browser.get(profile_path)
+    x = browser.find_element_by_xpath
+    xs = browser.find_elements_by_xpath
+    alias = x('//a/text()[. = "Timeline"][1]/..').get_attribute('href')[8:].split('?')[0]
+    d = {
+        'id': profile_id,
+        'name': browser.title,
+        'alias': alias if alias !='profile.php' else '',
+        'meta' : {
+            'created': time.strftime('%Y-%m-%d', time.localtime(os.path.getctime(profile_file))),
+        }
+    }
 
-            try:
-                db_save(db_profiles,profiles)
-            except KeyboardInterrupt:
-                print('Saving last record...')
-                db_save(db_profiles,profiles)
-                print('\nThanks for using the script! Please raise any issues at https://github.com/jcontini/facebook-scraper/issues.')
-                sys.exit()
+    print('>> Parsing: %s (# %s)' % (d['name'], d['id']))
+
+    for k,v in sections.items():
+        try:
+            if 'src' in v:
+                d[str(k)] = x(v['src']).get_attribute('src')
+            elif 'txt' in v:
+                d[str(k)] = x(v['txt']).text
+            elif 'href' in v:
+                d[str(k)] = x(v['href']).get_attribute('href')[8:].split('?')[0]
+            elif 'table' in v:
+                d['details'] = []
+                rows = xs(v['table']+'td[1])')
+                for i in range (1, len(rows)+1):
+                    deets_key = x(v['table']+'td[1])'+'['+str(i)+']').text
+                    deets_val = x(v['table']+'td[2])'+'['+str(i)+']').text
+                    d['details'].append({deets_key:deets_val})
+            elif 'workedu' in v:
+                d[str(k)] = []
+                base = v['workedu']
+                rows = xs(base)
+                for i in range (1, len(rows)+1):
+                    dd = {}
+                    dd['link'] = x(base+'['+str(i)+']'+'/div/div[1]//a').get_attribute('href')[8:].split('&')[0].split('/')[0]
+                    dd['org'] = x(base+'['+str(i)+']'+'/div/div[1]//a').text
+                    dd['lines'] = []
+                    lines = xs(base+'['+str(i)+']'+'/div/div[1]/div')
+                    for l in range (2, len(lines)+1):
+                        line = x(base+'['+str(i)+']'+'/div/div[1]/div'+'['+str(l)+']').text
+                        dd['lines'].append(line)
+                    d[str(k)].append(dd)
+            elif 'fam' in v:
+                d[str(k)] = []
+                base = v['fam']
+                rows = xs(base)
+                for i in range (1, len(rows)+1):
+                    d[str(k)].append({
+                        'name': x(base+'['+str(i)+']'+'//h3[1]').text,
+                        'rel': x(base+'['+str(i)+']'+'//h3[2]').text,
+                        'alias': x(base+'['+str(i)+']'+'//h3[1]/a').get_attribute('href')[8:].split('?')[0]
+                    })
+            elif 'life_events' in k:
+                d[str(k)] = []
+                base = v['years']
+                years = xs(base)
+                for i in range (1,len(years)+1):
+                    year = x(base+'['+str(i)+']'+'/div[1]').text
+                    events = xs(base+'['+str(i)+']'+'/div/div/a')
+                    for e in range(1,len(events)+1):
+                        event = x('('+base+'['+str(i)+']'+'/div/div/a)'+'['+str(e)+']')
+                        d[str(k)].append({
+                            'year': year,
+                            'title': event.text,
+                            'link': event.get_attribute('href')[8:].split('refid')[0]
+                        })
             
+        except exceptions.NoSuchElementException:
+            pass
+
+    return d
+
+# Parse all unparsed profiles in db profile folder
+def parse_profile_files():
+    already_parsed = []
+    profiles = db_read(db_profiles)
+    for profile in profiles:
+        already_parsed.append(profile['id'])
+
+    profile_files = glob.glob(profiles_dir+'*.html')
+    for profile_file in profile_files:
+        profile_id = int(os.path.basename(profile_file).split('.')[0])
+        if not profile_id in already_parsed:
+            profile = parse_profile(profile_file)
+            profiles.append(profile)
+            db_save(db_profiles,profiles)
+    
     print('>> %s profiles parsed to %s' % (len(profile_files),db_profiles))
 
-
-# Geocode locations
+# Create index of friends and their locations
 
 def index_locations():
     print("Indexing locations...")
@@ -304,10 +315,7 @@ def index_locations():
         json.dump(locations, f, indent=4)
     print('Indexed %s friends locations to %s' % (len(locations),db_friend_locations))
 
-
-# In[ ]:
-
-
+# Get coordinates for all locations and save to GeoJSON
 def geocode_locations():
     with open(db_friend_locations) as f:
         data = json.load(f)
@@ -333,10 +341,7 @@ def geocode_locations():
         json.dump(geos, f, indent=4)
     print('Indexed %s coordinates to %s' % (len(geos),db_geo))
 
-
-# In[ ]:
-
-
+# Make map from HTML Mapbox template & GeoJSON
 def make_map():
     #Open friends-locations list
     with open(db_friend_locations) as f:
@@ -434,7 +439,7 @@ if __name__ == '__main__':
             if len(profiles_db) == len(profile_files):
                 print(">> Profile parsing completed, moving on")
             else:
-                parse_profiles()
+                parse_profile_files()
 
         #Geocode
             index_locations()
@@ -448,7 +453,7 @@ if __name__ == '__main__':
             if not signed_in: sign_in()
             download_profiles()
         elif args.parse:
-            parse_profiles()
+            parse_profile_files()
         elif args.geocode:
             index_locations()
             geocode_locations()
