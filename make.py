@@ -318,11 +318,15 @@ def geocode_locations():
     for r in data:
         locations.append(r['location'])
     unique_locations = list(set(locations))
+    num_items = len(unique_locations)
 
     url_base = 'https://api.mapbox.com/geocoding/v5/mapbox.places/'
     print('Geocoding locations from profiles...')
     geos = []
-    for location in unique_locations:
+    for i, location in enumerate(unique_locations):
+        stdout.write("\rGeocoding locations... (%d / %d)" % (i,num_items))
+        stdout.flush()
+
         r = requests.get(url_base + location + '.json',
          params={
              'access_token': mapbox_token,
@@ -330,11 +334,12 @@ def geocode_locations():
              'limit': 1
          })
         coordinates = r.json()['features'][0]['geometry']['coordinates']
-
-        stdout.write('\r%s %s                    ' % (location ,coordinates))
-        stdout.flush()
+        d = {
+            'name': location,
+            'coordinates': coordinates
+        }
         
-        geos.append({location:coordinates})
+        geos.append(d)
     
     db_save(db_geo,geos)
     print('>> Saved coordinates for %s locations to %s' % (len(geos),db_geo))
@@ -344,9 +349,8 @@ def make_map():
     friend_locations = db_read(db_friend_locations)
     location_coordinates = db_read(db_geo)
     geo_dict = {}
-    for loc in location_coordinates:
-        for k_loc,v_coordinates in loc.items():
-            geo_dict[k_loc] = v_coordinates
+    for location in location_coordinates:
+        geo_dict[location['name']] = location['coordinates']
 
     features = []
     for i,friend in enumerate(friend_locations):
@@ -452,5 +456,5 @@ if __name__ == '__main__':
             make_map()
 
     except KeyboardInterrupt:
-        print('\nThanks for using the script! Please raise any issues at https://github.com/jcontini/facebook-scraper/issues.')
+        print('\nThanks for using the script! Please raise any issues on Github.')
         pass

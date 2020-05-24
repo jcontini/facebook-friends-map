@@ -11,6 +11,7 @@ requests = "*"
 selenium = "*"
 geojson = "*"
 chromedriver-binary = "*"
+sqlite-utils = "*"
 
 [requires]
 python_version = "3.7"
