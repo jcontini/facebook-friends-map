@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import argparse, json, os, glob, time, sys, requests, random, glob, webbrowser, chromedriver_binary
+import argparse, json, sqlite3, os, glob, time, sys, requests, random, glob, webbrowser, chromedriver_binary, utils
 from selenium.webdriver import Chrome, ChromeOptions
 from selenium.common import exceptions
 from datetime import datetime
@@ -32,38 +32,17 @@ else:
     print("\nGreat! Details saved in .env, so you shouldn't need to do this again.\n")
 
 # Prepare database
-friends_html = 'db/index.html'
+friends_html = 'db/friend_list.html'
 profiles_dir = 'db/profiles/'
-db_index = 'db/index.json'
-db_profiles = 'db/profiles.json'
-db_friend_locations = 'db/friend_locations.json'
-db_geo = 'db/geo.json'
 db_geojson = "db/points.geojson"
+
+db_index = 'friend_list'
+db_profiles = 'profiles'
+db_friend_locations = 'friend_locations'
+db_geo = 'location_coordinates'
 
 if not os.path.exists(profiles_dir):
     os.makedirs(profiles_dir)
-if not os.path.exists(db_index):
-    with open(db_index,'w') as f:
-        f.write("[]")
-if not os.path.exists(db_profiles):
-    with open(db_profiles,'w') as f:
-        f.write("[]")
-
-def db_save(db,data):
-    try:
-        with open(db, 'w', encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-    except KeyboardInterrupt:
-            print('\nSaving last record...')
-            with open(db, 'w', encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
-            print('\nThanks for using the script! Please raise any issues on Github')
-            sys.exit()
-
-def db_read(db):
-    with open(db) as f:
-        data = json.load(f)
-        return data
 
 # Configure browser
 def start_browser():
@@ -113,11 +92,11 @@ def download_friends_list():
 
 # Parse friends list into JSON
 def index_friends():
-    friends = db_read(db_index)
+    friends = utils.db_read(db_index)
     already_parsed = []
     for i,d in enumerate(friends):
         already_parsed.append(d['id'])
-    print('Opening saved friends list...')
+    print('Loading saved friends list...')
     browser.get('file:///' + os.getcwd() + '/' + friends_html)
     base = '(//*[@data-sigil="undoable-action"])'
     num_items = len(browser.find_elements_by_xpath(base))
@@ -138,17 +117,17 @@ def index_friends():
                 'alias': alias,
                 'photo_url': browser.find_element_by_xpath(b+'div[1]/a/i').get_attribute('style').split('("')[1].split('")')[0],
                 }
-            print('\n>> Added %s (#%s)' % (d['name'],i))
-            friends.append(d)
+            stdout.write('\r>> Added %s (#%s)                             \n' % (d['name'],i))
+            stdout.flush()
 
-            db_save(db_index,friends)
+            utils.db_write(db_index,d)
     print('\n>> Saved friends list (%s) to %s' % (num_items,db_index))
 
 # Download profile pages
 def download_profiles():
     print('Downloading profiles...')
     session_downloads = 0
-    index = db_read(db_index)
+    index = utils.db_read(db_index)
     for i,d in enumerate(index):
         if not d['is_deactivated']:
             fname = profiles_dir + str(d['id']) + '.html'
@@ -264,7 +243,7 @@ def parse_profile(profile_file):
 # Parse all unparsed profiles in db profile folder
 def parse_profile_files():
     already_parsed = []
-    profiles = db_read(db_profiles)
+    profiles = utils.db_read(db_profiles)
     for profile in profiles:
         already_parsed.append(profile['id'])
 
@@ -274,7 +253,7 @@ def parse_profile_files():
         if not profile_id in already_parsed:
             profile = parse_profile(profile_file)
             profiles.append(profile)
-            db_save(db_profiles,profiles)
+            utils.db_write(db_profiles,profile)
     
     print('>> %s profiles parsed to %s' % (len(profile_files),db_profiles))
 
@@ -282,38 +261,32 @@ def parse_profile_files():
 
 def index_locations():
     print("Scanning profiles for location (eg. current city)...")
-    profiles = db_read(db_profiles)
-    index = db_read(db_index)
-    locations = []
-
+    profiles = utils.db_read(db_profiles)
+    #TODO: Only add locations if not already in database.
+    #TODO: Better yet, just add to existing profiles DB
     for p in profiles:
+        details = json.loads(p['details'])
         loc = ''
-        for d in p['details']:
+        for d in details:
             if d.get('Address'):
                 loc = d.get('Address')
-        for d in p['details']:
+        for d in details:
             if d.get('Current City'):
                 loc = d.get('Current City')  
-        
-        for d in index:
-            if p['id'] == d['id']:
-                photo = d['photo_url']
                 
-        if loc:
+        if loc != '':
             d = {
                 'id': p['id'],
                 'name': p['name'],
-                'location': loc,
-                'photo': photo
+                'location': loc
             }
-            locations.append(d)
-    
-    db_save(db_friend_locations,locations)
-    print('>> Saved %s friend locations to %s' % (len(locations),db_friend_locations))
+            utils.db_write(db_friend_locations,d)
+
+    print('>> Extracted friend locations')
 
 # Get coordinates for all locations and save to GeoJSON
 def geocode_locations():
-    data = db_read(db_friend_locations)
+    data = utils.db_read(db_friend_locations)
     locations = []
     for r in data:
         locations.append(r['location'])
@@ -322,7 +295,6 @@ def geocode_locations():
 
     url_base = 'https://api.mapbox.com/geocoding/v5/mapbox.places/'
     print('Geocoding locations from profiles...')
-    geos = []
     for i, location in enumerate(unique_locations):
         stdout.write("\rGeocoding locations... (%d / %d)" % (i,num_items))
         stdout.flush()
@@ -339,15 +311,14 @@ def geocode_locations():
             'coordinates': coordinates
         }
         
-        geos.append(d)
-    
-    db_save(db_geo,geos)
-    print('>> Saved coordinates for %s locations to %s' % (len(geos),db_geo))
+        utils.db_write(db_geo,d)
+
+    print('>> Saved coordinates for %s locations to %s' % (num_items,db_geo))
 
 # Make map from HTML Mapbox template & GeoJSON
 def make_map():
-    friend_locations = db_read(db_friend_locations)
-    location_coordinates = db_read(db_geo)
+    friend_locations = utils.db_read(db_friend_locations)
+    location_coordinates = utils.db_read(db_geo)
     geo_dict = {}
     for location in location_coordinates:
         geo_dict[location['name']] = location['coordinates']
@@ -356,7 +327,7 @@ def make_map():
     for i,friend in enumerate(friend_locations):
         friend['coordinates'] = geo_dict[friend['location']]
         features.append(Feature(
-                geometry = Point(friend['coordinates']),
+                geometry = Point(json.loads(friend['coordinates'])),
                 properties = {
                     'name': friend['name'],
                     'location': friend['location'],
@@ -367,7 +338,7 @@ def make_map():
         with open(db_geojson, "w") as f:
             f.write('%s' % collection)
 
-    print('>> Added coordinates for %s friends!' % len(friend_locations))
+    print('>> Added coordinates for %s locations!' % len(location_coordinates))
 
     with open('template-map.html') as f:
         html=f.read()
@@ -384,7 +355,6 @@ if __name__ == '__main__':
     parser.add_argument('--index', action='store_true', help='Index friends list')
     parser.add_argument('--download', action='store_true', help='Download friends profiles')
     parser.add_argument('--parse', action='store_true', help='Parse profiles to JSON')
-    parser.add_argument('--geocode', action='store_true', help='Geocode addresses to coordinates')
     parser.add_argument('--map', action='store_true', help='Make the map!')
     args = parser.parse_args()
     browser = start_browser()
@@ -393,7 +363,7 @@ if __name__ == '__main__':
         if not len(sys.argv) > 1:
         #Index friends list
             signed_in = sign_in()
-            count_indexed = len(db_read(db_index))
+            count_indexed = len(utils.db_read(db_index))
             if not signed_in: sign_in()
             download_friends_list()
             index_friends()
@@ -406,7 +376,7 @@ if __name__ == '__main__':
                 downloaded_ids.append(int(f.replace('.html','')))
                 
             # Get list of active indexed IDs
-            indexed_profiles = db_read(db_index)
+            indexed_profiles = utils.db_read(db_index)
             if len(indexed_profiles) == 0:
                 print(">> No profiles indexed. Please delete "+db_index+" and run again")
                 sys.exit(1)
@@ -430,7 +400,7 @@ if __name__ == '__main__':
                 download_profiles()
 
         #Parse profiles
-            profiles_db = db_read(db_profiles)
+            profiles_db = utils.db_read(db_profiles)
             if len(profiles_db) == len(profile_files):
                 print(">> Profile parsing completed, moving on")
             else:
@@ -442,18 +412,18 @@ if __name__ == '__main__':
             make_map()
 
         #Run only specific tasks if specified in arguments    
-        elif args.index:
-            index_friends()
-        elif args.download:
-            if not signed_in: sign_in()
-            download_profiles()
-        elif args.parse:
-            parse_profile_files()
-        elif args.geocode:
-            index_locations()
-            geocode_locations()
-        elif args.map:
-            make_map()
+        else:
+            if args.index:
+                index_friends()
+            if args.download:
+                if not signed_in: sign_in()
+                download_profiles()
+            if args.parse:
+                parse_profile_files()
+            if args.map:
+                index_locations()
+                geocode_locations()
+                make_map()
 
     except KeyboardInterrupt:
         print('\nThanks for using the script! Please raise any issues on Github.')
