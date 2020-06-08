@@ -38,8 +38,7 @@ db_geojson = "db/points.geojson"
 
 db_index = 'friend_list'
 db_profiles = 'profiles'
-db_friend_locations = 'friend_locations'
-db_geo = 'location_coordinates'
+db_locations = 'locations'
 
 if not os.path.exists(profiles_dir):
     os.makedirs(profiles_dir)
@@ -174,9 +173,7 @@ def parse_profile(profile_file):
         'id': profile_id,
         'name': browser.title,
         'alias': alias if alias !='profile.php' else '',
-        'meta' : {
-            'created': time.strftime('%Y-%m-%d', time.localtime(os.path.getctime(profile_file))),
-        }
+        'meta_created' : time.strftime('%Y-%m-%d', time.localtime(os.path.getctime(profile_file)))
     }
 
     print('>> Parsing: %s (# %s)' % (d['name'], d['id']))
@@ -258,12 +255,10 @@ def parse_profile_files():
     print('>> %s profiles parsed to %s' % (len(profile_files),db_profiles))
 
 # Create index of friends and their locations
-
 def index_locations():
     print("Scanning profiles for location (eg. current city)...")
     profiles = utils.db_read(db_profiles)
-    #TODO: Only add locations if not already in database.
-    #TODO: Better yet, just add to existing profiles DB
+    
     for p in profiles:
         details = json.loads(p['details'])
         loc = ''
@@ -275,70 +270,51 @@ def index_locations():
                 loc = d.get('Current City')  
                 
         if loc != '':
-            d = {
-                'id': p['id'],
-                'name': p['name'],
-                'location': loc
-            }
-            utils.db_write(db_friend_locations,d)
+            utils.db_update(db_profiles,p['id'],{'location': loc})
 
-    print('>> Extracted friend locations')
+    print('>> Updated friend locations')
 
-# Get coordinates for all locations and save to GeoJSON
-def geocode_locations():
-    data = utils.db_read(db_friend_locations)
-    locations = []
-    for r in data:
-        locations.append(r['location'])
-    unique_locations = list(set(locations))
-    num_items = len(unique_locations)
-
-    url_base = 'https://api.mapbox.com/geocoding/v5/mapbox.places/'
-    print('Geocoding locations from profiles...')
-    for i, location in enumerate(unique_locations):
-        stdout.write("\rGeocoding locations... (%d / %d)" % (i,num_items))
-        stdout.flush()
-
-        r = requests.get(url_base + location + '.json',
-         params={
-             'access_token': mapbox_token,
-             'types': 'place,address',
-             'limit': 1
-         })
-        coordinates = r.json()['features'][0]['geometry']['coordinates']
-        d = {
-            'name': location,
-            'coordinates': coordinates
-        }
-        
-        utils.db_write(db_geo,d)
-
-    print('>> Saved coordinates for %s locations to %s' % (num_items,db_geo))
-
-# Make map from HTML Mapbox template & GeoJSON
+# Get coordinates for all locations
 def make_map():
-    friend_locations = utils.db_read(db_friend_locations)
-    location_coordinates = utils.db_read(db_geo)
+    print('Geocoding locations from profiles...')
+    url_base = 'https://api.mapbox.com/geocoding/v5/mapbox.places/'
+
+    profiles = utils.db_read(db_profiles)
+    locations = utils.db_read(db_locations)
+    
     geo_dict = {}
-    for location in location_coordinates:
-        geo_dict[location['name']] = location['coordinates']
-
+    for location in locations:
+        geo_dict[location['location']] = location['coordinates']
+    
     features = []
-    for i,friend in enumerate(friend_locations):
-        friend['coordinates'] = geo_dict[friend['location']]
-        features.append(Feature(
-                geometry = Point(json.loads(friend['coordinates'])),
-                properties = {
-                    'name': friend['name'],
-                    'location': friend['location'],
-                    'id': friend['id']
-                }
-            ))
-        collection = FeatureCollection(features)
-        with open(db_geojson, "w") as f:
-            f.write('%s' % collection)
+    for d in profiles:
+        if d['location'] is not None:
+            stdout.write("\r>> Geocoding %s                         " % (d['location']))
+            stdout.flush()
+            if d['location'] in geo_dict:
+                coordinates = json.loads(geo_dict[d['location']])
+            else:
+                r = requests.get(url_base + d['location'] + '.json', params={
+                    'access_token': mapbox_token,
+                    'types': 'place,address',
+                    'limit': 1
+                })
+                try:
+                    coordinates = r.json()['features'][0]['geometry']['coordinates']
+                except IndexError:
+                    pass
 
-    print('>> Added coordinates for %s locations!' % len(location_coordinates))
+                utils.db_write(db_locations,{'location': d['location'],'coordinates': coordinates})
+                geo_dict[d['location']] = str(coordinates)
+
+            features.append(Feature(
+                geometry = Point(coordinates),
+                properties = {'name': d['name'],'location': d['location'],'id': d['id']}
+            ))
+
+            collection = FeatureCollection(features)
+            with open(db_geojson, "w") as f:
+                f.write('%s' % collection)
 
     with open('template-map.html') as f:
         html=f.read()
@@ -408,7 +384,6 @@ if __name__ == '__main__':
 
         #Geocode
             index_locations()
-            geocode_locations()
             make_map()
 
         #Run only specific tasks if specified in arguments    
@@ -422,7 +397,6 @@ if __name__ == '__main__':
                 parse_profile_files()
             if args.map:
                 index_locations()
-                geocode_locations()
                 make_map()
 
     except KeyboardInterrupt:
