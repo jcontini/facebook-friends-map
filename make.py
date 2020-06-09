@@ -120,6 +120,7 @@ def index_friends():
             stdout.flush()
 
             utils.db_write(db_index,d)
+
     print('\n>> Saved friends list (%s) to %s' % (num_items,db_index))
 
 # Download profile pages
@@ -271,7 +272,7 @@ def index_locations():
                 
         if loc != '':
             utils.db_update(db_profiles,p['id'],{'location': loc})
-
+    
     print('>> Updated friend locations')
 
 # Get coordinates for all locations
@@ -330,8 +331,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Facebook friends profile exporter')
     parser.add_argument('--index', action='store_true', help='Index friends list')
     parser.add_argument('--download', action='store_true', help='Download friends profiles')
-    parser.add_argument('--parse', action='store_true', help='Parse profiles to JSON')
+    parser.add_argument('--parse', action='store_true', help='Parse profiles to database')
     parser.add_argument('--map', action='store_true', help='Make the map!')
+    parser.add_argument('--json', action='store_true', help='Export database to JSON files')
     args = parser.parse_args()
     browser = start_browser()
     signed_in = False
@@ -398,6 +400,10 @@ if __name__ == '__main__':
             if args.map:
                 index_locations()
                 make_map()
+            if args.json:
+                utils.db_to_json(db_index,'friend_list')
+                utils.db_to_json(db_profiles,'profiles')
+                utils.db_to_json(db_locations,'locations')
 
     except KeyboardInterrupt:
         print('\nThanks for using the script! Please raise any issues on Github.')

@@ -39,6 +39,7 @@ Then:
 - `-- download` Download profile for each friend in index
 - `-- parse` Extract profiles HTML into profiles.json
 - `-- map` Geocode addresses & make the map!
+- `-- json` Export sqlite database to JSON files (db/)
 
 If something breaks, just run the script again. It's built to pick up where it left off at all stages.
 Please file an issue if you run into any problems. Enjoy!
