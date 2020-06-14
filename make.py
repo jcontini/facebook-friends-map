@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import argparse, json, sqlite3, os, glob, time, sys, requests, random, glob, webbrowser, chromedriver_binary, utils
-from selenium.webdriver import Chrome, ChromeOptions
+import argparse, json, sqlite3, os, glob, time, sys, requests, random, glob, webbrowser, utils
+from selenium import webdriver
 from selenium.common import exceptions
 from datetime import datetime
 from geojson import Feature, FeatureCollection, Point
@@ -45,16 +45,18 @@ if not os.path.exists(profiles_dir):
 
 # Configure browser
 def start_browser():
-    options = ChromeOptions() 
-    options.add_argument("--disable-notifications")
-    options.add_argument("--disable-infobars")
-    options.add_argument("--mute-audio")
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--headless')
-    options.add_experimental_option("prefs",{"profile.managed_default_content_settings.images":2})
+    # Ensure mobile-friendly view for parsing
+    useragent = "Mozilla/5.0 (Linux; Android 8.0.0; Pixel 2 XL Build/OPD1.170816.004) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.87 Mobile Safari/537.36"
 
-    browser = Chrome(options=options)
+    #Firefox
+    profile = webdriver.FirefoxProfile()
+    profile.set_preference("general.useragent.override", useragent)
+    options = webdriver.FirefoxOptions()
+    options.set_preference("dom.webnotifications.serviceworker.enabled", False)
+    options.set_preference("dom.webnotifications.enabled", False)
+    options.add_argument('--headless')
+
+    browser = webdriver.Firefox(firefox_profile=profile,options=options)
     return browser
 
 # Login

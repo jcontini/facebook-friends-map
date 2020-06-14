@@ -10,8 +10,8 @@ pylint = "*"
 requests = "*"
 selenium = "*"
 geojson = "*"
-chromedriver-binary = "*"
 sqlite-utils = "*"
+webdriverdownloader = "*"
 
 [requires]
 python_version = "3.7"

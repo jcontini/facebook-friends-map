@@ -21,7 +21,6 @@ All data is saved locally in `db/data.db` as a sqlite database.
  
 ## Installation
 Prerequisites:
-- Install the latest version of [Google Chrome Beta](https://www.google.com/chrome/beta/). This tool uses the latest version of the `chromedriver-binary`, which has to match the latest version of chrome.
 - Make sure that `python 3` and `pipenv` are installed.
 - Create a free [Mapbox API key](https://docs.mapbox.com/help/glossary/access-token). You'll need this so the tool can geocode city names into coordinates to use on the map. 
 
@@ -35,11 +34,11 @@ Then:
 2. Run `python make.py`. On the first run, it'll ask for your Facebook username/password and Mapbox API Key. It saves these to the local `.env` file for use in subsequent runs (eg if you add more friends).
 3. The tool will then index your friend list, download friend's profiles, geocode coordinates, and create the map. You can optionally use any of these flags to perform only certain actions:
 
-- `-- index` Sign in, create friends list index only
-- `-- download` Download profile for each friend in index
-- `-- parse` Extract profiles HTML into profiles.json
-- `-- map` Geocode addresses & make the map!
-- `-- json` Export sqlite database to JSON files (db/)
+- `--index` Sign in, create friends list index only
+- `--download` Download profile for each friend in index
+- `--parse` Extract profiles HTML into profiles.json
+- `--map` Geocode addresses & make the map!
+- `--json` Export sqlite database to JSON files (db/)
 
 If something breaks, just run the script again. It's built to pick up where it left off at all stages.
 Please file an issue if you run into any problems. Enjoy!
