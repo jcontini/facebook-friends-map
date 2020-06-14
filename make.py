@@ -340,72 +340,32 @@ if __name__ == '__main__':
     browser = start_browser()
     signed_in = False
     try:
-        if not len(sys.argv) > 1:
+        fullrun = True if len(sys.argv) == 1 else False
+
         #Index friends list
+        if fullrun or args.index:
             signed_in = sign_in()
-            count_indexed = len(utils.db_read(db_index))
             if not signed_in: sign_in()
             download_friends_list()
             index_friends()
 
         #Download profiles
-            # Get list of downloaded ids
-            profile_files = glob.glob1(profiles_dir,'*.html')
-            downloaded_ids = []
-            for f in profile_files:
-                downloaded_ids.append(int(f.replace('.html','')))
-                
-            # Get list of active indexed IDs
-            indexed_profiles = utils.db_read(db_index)
-            if len(indexed_profiles) == 0:
-                print(">> No profiles indexed. Please delete "+db_index+" and run again")
-                sys.exit(1)
-            indexed_ids = []
-            for i in indexed_profiles:
-                if i['is_deactivated'] == False:
-                    indexed_ids.append(i['id'])
-
-            # Do some counting
-            count_inactive = len(indexed_profiles)-len(indexed_ids)
-            inactive_downloaded = list(set(downloaded_ids) - set(indexed_ids))
-            ids_to_download = list(set(indexed_ids) - set(downloaded_ids))
-
-            print(">> %s Profiles active (%s deactivated)" % (len(indexed_ids),count_inactive))
-            print(">> %s Profiles downloaded (including %s deactivated)" % (len(downloaded_ids),len(inactive_downloaded)))
-
-            # If new profiles to download, get to it
-            if len(ids_to_download) != 0:
-                print(">> %s new profiles to download! Getting to it..." % (len(ids_to_download)))
-                if not signed_in: sign_in()
-                download_profiles()
+        if fullrun or args.download:
+            if not signed_in: sign_in()
+            download_profiles()
 
         #Parse profiles
-            profiles_db = utils.db_read(db_profiles)
-            if len(profiles_db) == len(profile_files):
-                print(">> Profile parsing completed, moving on")
-            else:
-                parse_profile_files()
+        if fullrun or args.parse:
+            parse_profile_files()
 
         #Geocode
+        if fullrun or args.map:
             index_locations()
             make_map()
 
-        #Run only specific tasks if specified in arguments    
-        else:
-            if args.index:
-                index_friends()
-            if args.download:
-                if not signed_in: sign_in()
-                download_profiles()
-            if args.parse:
-                parse_profile_files()
-            if args.map:
-                index_locations()
-                make_map()
-            if args.json:
-                utils.db_to_json(db_index,'friend_list')
-                utils.db_to_json(db_profiles,'profiles')
-                utils.db_to_json(db_locations,'locations')
+        #JSON Export (Optional)
+        if fullrun or args.json:
+            utils.db_to_json()
 
     except KeyboardInterrupt:
         print('\nThanks for using the script! Please raise any issues on Github.')
