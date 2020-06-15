@@ -22,33 +22,14 @@ db = Database(db_path)
 def db_setup():
     db["friend_list"].create({
         'id':int,
-        'name':str,
-        'is_deactivated':int,
-        'alias':str,
-        'photo_url':str
     }, pk="id")
 
     db["profiles"].create({
         'id':int,
-        'name':str,
-        'location':str,
-        'alias':str,
-        'tagline':str,
-        'about':str,
-        'quotes':str,
-        'rel':str,
-        'rel_partner':str,
-        'details':str,
-        'work':str,
-        'education':str,
-        'family':str,
-        'life_events':str,
-        'meta_created':str
-    }, pk="id")
+        }, pk="id")
 
     db["locations"].create({
-        "location":str,
-        'coordinates':str
+        "location":str
         }, pk="location")
 
     print('>> Database initialized (%s)' % db_path)
@@ -61,10 +42,10 @@ def db_read(table):
 
 def db_write(table,data):
     db_table = db[table]
-    db_table.insert(data)
+    db_table.insert(data, alter=True)
 
 def db_update(table,id,data):
-    db[table].update(id, data)
+    db[table].update(id, data, alter=True)
 
 def db_to_json():
     json_folder = db_folder + 'json/'

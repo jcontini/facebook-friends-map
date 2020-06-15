@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import argparse, json, sqlite3, os, glob, time, sys, requests, random, glob, webbrowser, utils
+from lxml import html
 from selenium import webdriver
 from selenium.common import exceptions
 from datetime import datetime
@@ -14,7 +15,6 @@ if os.path.exists('.env'):
     fb_user = os.getenv('fb_user')
     fb_pass = os.getenv('fb_pass')
     mapbox_token = os.getenv('mapbox_token')
-    print('>> Loaded credentials from .env file.')
 else:
     print("Welcome! Let's set up your environment. This will create a .env file in the same folder as this script, and set it up with your email, password, and Mapbox API Key. This is saved only on your device and only used to autofill the Facebook login form.\n")
 
@@ -93,6 +93,7 @@ def download_friends_list():
 
 # Parse friends list into JSON
 def index_friends():
+    #TODO: Update this to use lxml instead of selenium
     friends = utils.db_read(db_index)
     already_parsed = []
     for i,d in enumerate(friends):
@@ -152,96 +153,94 @@ def download_profiles():
 
 # Parse profile pages into JSON
 def parse_profile(profile_file):
-    sections = {
-        'tagline': {'txt':'//*[@id="root"]/div[1]/div[1]/div[2]/div[2]'},
-        'about': {'txt':'//div[@id="bio"]/div/div/div'},
-        'quotes': {'txt':'//*[@id="quote"]/div/div/div'},
-        'rel': {'txt':'//div[@id="relationship"]/div/div/div'},
-        'rel_partner': {'href':'//div[@id="relationship"]/div/div/div//a'},
-        'details': {'table':'(//div[not(@id)]/div/div/table[@cellspacing]/tbody/tr//'},
-        'work': {'workedu':'//*[@id="work"]/div[1]/div/div'},
-        'education': {'workedu':'//*[@id="education"]/div[1]/div/div'},
-        'family': {'fam':'//*[@id="family"]/div/div/div'},
-        'life_events': {'years':'(//div[@id="year-overviews"]/div/div/div/div/div)'}
+    xp_queries = {
+        'tagline':      {'do':1,'txt':'//*[@id="root"]/div[1]/div[1]/div[2]/div[2]'},
+        'about':        {'do':1,'txt':'//div[@id="bio"]/div/div/div'},
+        'quotes':       {'do':1,'txt':'//*[@id="quote"]/div/div/div'},
+        'rel':          {'do':1,'txt':'//div[@id="relationship"]/div/div/div'},
+        'rel_partner':  {'do':1,'href':'//div[@id="relationship"]/div/div/div//a'},
+        'details':      {'do':1,'table':'(//div[not(@id)]/div/div/table[@cellspacing]/tbody/tr//'},
+        'work':         {'do':1,'workedu':'//*[@id="work"]/div[1]/div/div'},
+        'education':    {'do':1,'workedu':'//*[@id="education"]/div[1]/div/div'},
+        'family':       {'do':1,'fam':'//*[@id="family"]/div/div/div'},
+        'life_events':  {'do':1,'years':'(//div[@id="year-overviews"]/div/div/div/div/div)'}
     }
 
     profile_id = int(os.path.basename(profile_file).split('.')[0])
     profile_path = 'file://' + os.getcwd() + '/' + profile_file
-    
-    browser.get(profile_path)
-    x = browser.find_element_by_xpath
-    xs = browser.find_elements_by_xpath
-    alias = x('//a/text()[. = "Timeline"][1]/..').get_attribute('href')[8:].split('?')[0]
+    x = html.parse(profile_path).xpath
+    alias = x('//a/text()[. = "Timeline"][1]/..')[0].get('href')[1:].split('?')[0]
     d = {
         'id': profile_id,
-        'name': browser.title,
+        'name': x('//head/title')[0].text,
         'alias': alias if alias !='profile.php' else '',
-        'meta_created' : time.strftime('%Y-%m-%d', time.localtime(os.path.getctime(profile_file)))
+        'meta_created' : time.strftime('%Y-%m-%d', time.localtime(os.path.getctime(profile_file))),
+        'details': []
     }
+    stdout.flush()
+    stdout.write("\r>> Parsing: %s (# %s)                    " % (d['name'], d['id']))
 
-    print('>> Parsing: %s (# %s)' % (d['name'], d['id']))
-
-    for k,v in sections.items():
-        try:
-            if 'src' in v:
-                d[str(k)] = x(v['src']).get_attribute('src')
-            elif 'txt' in v:
-                d[str(k)] = x(v['txt']).text
+    for k,v in xp_queries.items():
+        if v['do'] == 1:
+            if 'txt' in v:
+                elements = x(v['txt'])
+                if len(elements) > 0:
+                    d[str(k)] = str(x(v['txt'])[0].text_content())
             elif 'href' in v:
-                d[str(k)] = x(v['href']).get_attribute('href')[8:].split('?')[0]
+                elements = x(v['href'])
+                if len(elements) > 0:
+                    d[str(k)] = x(v['href'])[0].get('href')[1:].split('refid')[0][:-1]
             elif 'table' in v:
-                d['details'] = []
-                rows = xs(v['table']+'td[1])')
+                rows = x(v['table']+'td[1])')  
                 for i in range (1, len(rows)+1):
-                    deets_key = x(v['table']+'td[1])'+'['+str(i)+']').text
-                    deets_val = x(v['table']+'td[2])'+'['+str(i)+']').text
-                    d['details'].append({deets_key:deets_val})
+                    key = x(v['table']+'td[1])'+'['+str(i)+']')[0].text_content()
+                    val = x(v['table']+'td[2])'+'['+str(i)+']')[0].text_content()
+                    d['details'].append({key:val})
             elif 'workedu' in v:
                 d[str(k)] = []
                 base = v['workedu']
-                rows = xs(base)
+                rows = x(base)
                 for i in range (1, len(rows)+1):
                     dd = {}
-                    dd['link'] = x(base+'['+str(i)+']'+'/div/div[1]//a').get_attribute('href')[8:].split('&')[0].split('/')[0]
-                    dd['org'] = x(base+'['+str(i)+']'+'/div/div[1]//a').text
+                    dd['link'] = x(base+'['+str(i)+']'+'/div/div[1]//a')[0].get('href')[1:].split('refid')[0][:-1]
+                    dd['org'] = x(base+'['+str(i)+']'+'/div/div[1]//a')[0].text
                     dd['lines'] = []
-                    lines = xs(base+'['+str(i)+']'+'/div/div[1]/div')
+                    lines = x(base+'['+str(i)+']'+'/div/div[1]/div')
                     for l in range (2, len(lines)+1):
-                        line = x(base+'['+str(i)+']'+'/div/div[1]/div'+'['+str(l)+']').text
+                        line = x(base+'['+str(i)+']'+'/div/div[1]/div'+'['+str(l)+']')[0].text_content()
                         dd['lines'].append(line)
                     d[str(k)].append(dd)
             elif 'fam' in v:
                 d[str(k)] = []
                 base = v['fam']
-                rows = xs(base)
+                rows = x(base)
                 for i in range (1, len(rows)+1):
+                    xp_alias = x(base+'['+str(i)+']'+'//h3[1]/a')
+                    alias = '' if len(xp_alias) == 0 else xp_alias[0].get('href')[1:].split('refid')[0][:-1]
                     d[str(k)].append({
-                        'name': x(base+'['+str(i)+']'+'//h3[1]').text,
-                        'rel': x(base+'['+str(i)+']'+'//h3[2]').text,
-                        'alias': x(base+'['+str(i)+']'+'//h3[1]/a').get_attribute('href')[8:].split('?')[0]
+                        'name': x(base+'['+str(i)+']'+'//h3[1]')[0].text_content(),
+                        'rel': x(base+'['+str(i)+']'+'//h3[2]')[0].text_content(),
+                        'alias': alias
                     })
             elif 'life_events' in k:
                 d[str(k)] = []
                 base = v['years']
-                years = xs(base)
+                years = x(base)
                 for i in range (1,len(years)+1):
-                    year = x(base+'['+str(i)+']'+'/div[1]').text
-                    events = xs(base+'['+str(i)+']'+'/div/div/a')
+                    year = x(base+'['+str(i)+']'+'/div[1]/text()')[0]
+                    events = x(base+'['+str(i)+']'+'/div/div/a')
                     for e in range(1,len(events)+1):
                         event = x('('+base+'['+str(i)+']'+'/div/div/a)'+'['+str(e)+']')
                         d[str(k)].append({
                             'year': year,
-                            'title': event.text,
-                            'link': event.get_attribute('href')[8:].split('refid')[0]
+                            'title': event[0].text_content(),
+                            'link': event[0].get('href')[1:].split('refid')[0]
                         })
-            
-        except exceptions.NoSuchElementException:
-            pass
-
     return d
 
 # Parse all unparsed profiles in db profile folder
 def parse_profile_files():
+    print('>> Scanning downloaded profile pages...')
     already_parsed = []
     profiles = utils.db_read(db_profiles)
     for profile in profiles:
@@ -252,7 +251,6 @@ def parse_profile_files():
         profile_id = int(os.path.basename(profile_file).split('.')[0])
         if not profile_id in already_parsed:
             profile = parse_profile(profile_file)
-            profiles.append(profile)
             utils.db_write(db_profiles,profile)
     
     print('>> %s profiles parsed to %s' % (len(profile_files),db_profiles))
@@ -261,19 +259,17 @@ def parse_profile_files():
 def index_locations():
     print("Scanning profiles for location (eg. current city)...")
     profiles = utils.db_read(db_profiles)
+
+    detail_fields = ['Current City','Mobile','Email','Birthday']
     
     for p in profiles:
         details = json.loads(p['details'])
-        loc = ''
+        new_deets = {}
         for d in details:
-            if d.get('Address'):
-                loc = d.get('Address')
-        for d in details:
-            if d.get('Current City'):
-                loc = d.get('Current City')  
-                
-        if loc != '':
-            utils.db_update(db_profiles,p['id'],{'location': loc})
+            for k in d:
+                if k in detail_fields:
+                    new_deets[k] = d.get(k,'')
+        utils.db_update(db_profiles,p['id'],new_deets)
     
     print('>> Updated friend locations')
 
@@ -291,13 +287,14 @@ def make_map():
     
     features = []
     for d in profiles:
-        if d['location'] is not None:
-            stdout.write("\r>> Geocoding %s                         " % (d['location']))
+        city = d['Current City']
+        if city is not None:
             stdout.flush()
-            if d['location'] in geo_dict:
-                coordinates = json.loads(geo_dict[d['location']])
+            stdout.write("\r>> Geocoding %s                         \r" % (city))
+            if city in geo_dict:
+                coordinates = json.loads(geo_dict[city])
             else:
-                r = requests.get(url_base + d['location'] + '.json', params={
+                r = requests.get(url_base + city + '.json', params={
                     'access_token': mapbox_token,
                     'types': 'place,address',
                     'limit': 1
@@ -307,12 +304,12 @@ def make_map():
                 except IndexError:
                     pass
 
-                utils.db_write(db_locations,{'location': d['location'],'coordinates': coordinates})
-                geo_dict[d['location']] = str(coordinates)
+                utils.db_write(db_locations,{'location': city,'coordinates': coordinates})
+                geo_dict[city] = str(coordinates)
 
             features.append(Feature(
                 geometry = Point(coordinates),
-                properties = {'name': d['name'],'location': d['location'],'id': d['id']}
+                properties = {'name': d['name'],'location': city,'id': d['id']}
             ))
 
             collection = FeatureCollection(features)

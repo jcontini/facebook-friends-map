@@ -12,6 +12,7 @@ selenium = "*"
 geojson = "*"
 sqlite-utils = "*"
 webdriverdownloader = "*"
+lxml = "*"
 
 [requires]
 python_version = "3.7"
