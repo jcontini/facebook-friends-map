@@ -85,7 +85,7 @@ def download_friends_list():
         stdout.write("\r>> Scrolled to page %d" % (scrollpage))
         stdout.flush()
         scrollpage += 1
-        time.sleep(1)
+        time.sleep(0.5)
 
     with open (friends_html, 'w', encoding="utf-8") as f:
         f.write(browser.page_source)
@@ -93,35 +93,34 @@ def download_friends_list():
 
 # Parse friends list into JSON
 def index_friends():
-    #TODO: Update this to use lxml instead of selenium
     friends = utils.db_read(db_index)
     already_parsed = []
     for i,d in enumerate(friends):
         already_parsed.append(d['id'])
     print('Loading saved friends list...')
-    browser.get('file:///' + os.getcwd() + '/' + friends_html)
+
+    file_path = os.getcwd() + '/' + friends_html
+    x = html.parse(file_path).xpath
     base = '(//*[@data-sigil="undoable-action"])'
-    num_items = len(browser.find_elements_by_xpath(base))
+    num_items = len(x(base))
     if num_items == 0:
         print("\nWasn't able to parse friends index. This probably means that Facebook updated their template. \nPlease raise issue on Github and I will try to update the script. \nOr if you can code, please submit a pull request instead :)\n")
         sys.exit()
     for i in range(1,num_items+1):
         b = base + '['+str(i)+']/'
-        info = json.loads(browser.find_element_by_xpath(b+'/div[3]/div/div/div[3]').get_attribute('data-store'))
-        stdout.write("\rScanning friend list... (%d / %d)" % (i,num_items))
+        info = json.loads(x(b+'/div[3]/div/div/div[3]')[0].get('data-store'))
         stdout.flush()
+        stdout.write("\rScanning friend list... (%d / %d)" % (i,num_items))
         if not info['id'] in already_parsed:
-            alias = '' if info['is_deactivated'] else browser.find_element_by_xpath(b+'/div[2]//a').get_attribute('href')[8:]
+            name = x(b+'/div[2]//a')[0].text
+            alias = '' if info['is_deactivated'] else x(b+'/div[2]//a')[0].get('href')[1:]
             d = {
                 'id': info['id'],
-                'name': browser.find_element_by_xpath(b+'/div[2]//a').text,
-                'is_deactivated': info['is_deactivated'],
-                'alias': alias,
-                'photo_url': browser.find_element_by_xpath(b+'div[1]/a/i').get_attribute('style').split('("')[1].split('")')[0],
+                'name': name,
+                'active': 0 if int(info['is_deactivated']) else 1,
+                'alias': alias                
                 }
-            stdout.write('\r>> Added %s (#%s)                             \n' % (d['name'],i))
-            stdout.flush()
-
+            
             utils.db_write(db_index,d)
 
     print('\n>> Saved friends list (%s) to %s' % (num_items,db_index))
@@ -132,7 +131,7 @@ def download_profiles():
     session_downloads = 0
     index = utils.db_read(db_index)
     for i,d in enumerate(index):
-        if not d['is_deactivated']:
+        if d['active']:
             fname = profiles_dir + str(d['id']) + '.html'
             if not os.path.exists(fname):
                 print('- %s (# %s)' % (d['name'],d['id']))
@@ -328,6 +327,7 @@ def make_map():
 # Shell application
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Facebook friends profile exporter')
+    parser.add_argument('--list', action='store_true', help='Download friends list')
     parser.add_argument('--index', action='store_true', help='Index friends list')
     parser.add_argument('--download', action='store_true', help='Download friends profiles')
     parser.add_argument('--parse', action='store_true', help='Parse profiles to database')
@@ -339,11 +339,13 @@ if __name__ == '__main__':
     try:
         fullrun = True if len(sys.argv) == 1 else False
 
+        #Download friends list
+        if fullrun or args.list:
+            signed_in = sign_in()
+            download_friends_list()
+
         #Index friends list
         if fullrun or args.index:
-            signed_in = sign_in()
-            if not signed_in: sign_in()
-            download_friends_list()
             index_friends()
 
         #Download profiles

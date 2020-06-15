@@ -9,13 +9,19 @@ from webdriverdownloader import GeckoDriverDownloader
 gdd = GeckoDriverDownloader()
 gdd.download_and_install()
 
-# --- Database ---
+# --- Paths ---
 db_folder = 'db/'
-db_file = 'data.db'
-db_path = db_folder + db_file
+json_folder = db_folder + 'json/'
+
+if not os.path.exists(json_folder):
+    os.makedirs(json_folder)
 
 if not os.path.exists(db_folder):
     os.makedirs(db_folder)
+
+# --- Database ---
+db_file = 'data.db'
+db_path = db_folder + db_file
 
 db = Database(db_path)
 
@@ -48,10 +54,6 @@ def db_update(table,id,data):
     db[table].update(id, data, alter=True)
 
 def db_to_json():
-    json_folder = db_folder + 'json/'
-    if not os.path.exists(json_folder):
-        os.makedirs(json_folder)
-
     tables = db.table_names()
     for table in tables:
         data = []
