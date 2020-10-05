@@ -34,11 +34,12 @@ Then:
 2. Run `python make.py`. On the first run, it'll ask for your Facebook username/password and Mapbox API Key. It saves these to the local `.env` file for use in subsequent runs (eg if you add more friends).
 3. The tool will then index your friend list, download friend's profiles, geocode coordinates, and create the map. You can optionally use any of these flags to perform only certain actions:
 
-- `--index` Sign in, create friends list index only
-- `--download` Download profile for each friend in index
-- `--parse` Extract profiles HTML into profiles.json
+- `--list` Sign in, download friends list HTML
+- `--index` Extract friend list HTML to database
+- `--download` Download profile for each friend in index 
+- `--parse` Extract profiles HTML to database
 - `--map` Geocode addresses & make the map!
-- `--json` Export sqlite database to JSON files (db/)
+- `--json` Export sqlite database to JSON files (db/json/)
 
 If something breaks, just run the script again. It's built to pick up where it left off at all stages.
 Please file an issue if you run into any problems. Enjoy!
