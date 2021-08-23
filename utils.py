@@ -2,12 +2,10 @@
 # coding: utf-8
 import os, json
 from sqlite_utils import Database
-from webdriverdownloader import GeckoDriverDownloader
+from selenium import webdriver
 
-# --- Webdriver ---
-# Ensure webdriver is installed
-gdd = GeckoDriverDownloader()
-gdd.download_and_install()
+from webdriver_manager.firefox import GeckoDriverManager
+# driver = webdriver.Firefox(executable_path=GeckoDriverManager().install())
 
 # --- Paths ---
 db_folder = 'db/'
