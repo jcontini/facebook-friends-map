@@ -210,15 +210,30 @@ def parse_profile(profile_file):
                 base = v['workedu']
                 rows = x(base)
                 for i in range (1, len(rows)+1):
+                    # Prep the Work/Education object
                     dd = {}
-                    dd['link'] = x(base+'['+str(i)+']'+'/div/div[1]//a')[0].get('href')[1:].split('refid')[0][:-1]
-                    dd['org'] = x(base+'['+str(i)+']'+'/div/div[1]//a')[0].text
+                    workedu_base = base+'['+str(i)+']'+'/div/div[1]/div[1]'
+                    dd['org'] = x(workedu_base)[0].text_content()
+
+                    # Determine org URL
+                    if str(k) == "work":
+                        org_href = workedu_base + '/span/a' # work URL
+                    else:
+                        org_href = workedu_base + '/div/span/a' # edu URL
+
+                    # Include org URL if exists
+                    url_elements = x(org_href)
+                    if len(url_elements) > 0:
+                        dd['link'] = x(org_href)[0].get('href')[1:].split('refid')[0][:-1]
+                    
                     dd['lines'] = []
                     lines = x(base+'['+str(i)+']'+'/div/div[1]/div')
                     for l in range (2, len(lines)+1):
                         line = x(base+'['+str(i)+']'+'/div/div[1]/div'+'['+str(l)+']')[0].text_content()
                         dd['lines'].append(line)
+
                     d[str(k)].append(dd)
+
             elif 'fam' in v:
                 d[str(k)] = []
                 base = v['fam']
@@ -344,10 +359,12 @@ if __name__ == '__main__':
     parser.add_argument('--map', action='store_true', help='Make the map!')
     parser.add_argument('--json', action='store_true', help='Export database to JSON files')
     args = parser.parse_args()
-    browser = start_browser()
     signed_in = False
     try:
         fullrun = True if len(sys.argv) == 1 else False
+
+        if fullrun or args.list or args.index or args.download:
+            browser = start_browser()
 
         #Download friends list
         if fullrun or args.list:
