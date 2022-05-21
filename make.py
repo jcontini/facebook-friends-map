@@ -70,6 +70,16 @@ def sign_in():
     email_id.send_keys(fb_user)
     pass_id.send_keys(fb_pass)
     confirm_id.click()
+    time.sleep(3)
+
+    # If 2FA enabled, prompt for OTP
+    if "checkpoint" in browser.current_url:
+        otp_id = browser.find_element_by_id("approvals_code")
+        continue_id = browser.find_element_by_id("checkpointSubmitButton")
+
+        fb_otp = input("Enter OTP: ")
+        otp_id.send_keys(fb_otp)
+        continue_id.click()
 
     time.sleep(3)
     return True
